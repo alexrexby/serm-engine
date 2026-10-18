@@ -14,11 +14,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = PROJECT_ROOT / "examples" / "deploy" / "rsync-deploy.sh"
 
 FAKE_SSH = r"""#!/usr/bin/env bash
-# ssh [-o opt]... [-i key] host command...: run the command locally, like a remote login shell
+# ssh [options] [user@]host command...: run the command locally, like a remote login shell.
+# The destination arrives per rsync build: openrsync (macOS) passes "user@host", rsync 3.2.x (Linux)
+# splits it into "-l user host" - so options are skipped the way ssh parses them, not up to the first word.
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o) shift 2 ;;
     -i) printf '%s\n' "$2" >> "$FAKE_LOG_DIR/ssh-keys"; shift 2 ;;
+    -i?*) printf '%s\n' "${1#-i}" >> "$FAKE_LOG_DIR/ssh-keys"; shift ;;
+    -[BbcDEeFIJLlmOoPpQRSWw]) shift 2 ;;  # options with a value: -l user, -p 22, -o opt, -e char
+    --) shift; break ;;
+    -?*) shift ;;  # flags (-4 -A -C -q -T -x ...) and glued values (-p22, -oBatchMode=yes)
     *) break ;;
   esac
 done
@@ -92,7 +97,7 @@ def env(tmp_path):
         return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
     return type("Env", (), dict(deploy=staticmethod(deploy), server=server, logs=logs, key=key,
-                                docker_calls=staticmethod(docker_calls)))
+                                bin_dir=bin_dir, run_env=run_env, docker_calls=staticmethod(docker_calls)))
 
 
 def _state_kept(server):
@@ -100,6 +105,20 @@ def _state_kept(server):
     assert (server / ".env").read_text(encoding="utf-8") == "OPP_CHANNEL=@server\n"
     assert (server / "profiles" / "brand.yaml").is_file() and (server / "profiles" / "brand" / "templates").is_dir()
     assert not (server / "profiles" / "local-only.yaml").exists()
+
+
+@pytest.mark.parametrize("argv", [
+    ["-o", "BatchMode=yes", "-i", "/k ey", "deploy@server", "echo", "ran"],  # openrsync, the script's own ssh
+    ["-o", "BatchMode=yes", "-i", "/k ey", "-l", "deploy", "server", "echo", "ran"],  # rsync 3.2.x
+    ["-i/k ey", "-p", "22", "-oConnectTimeout=10", "-x", "-T", "-e", "none", "-l", "deploy", "--", "server",
+     "echo", "ran"],
+])
+def test_fake_ssh_finds_host_in_both_rsync_forms(env, argv):
+    # CI on ubuntu: rsync 3.2.7 passes "-l deploy server", the old fake took "-l" for the host and ran "deploy"
+    ssh = env.bin_dir / "ssh"
+    res = subprocess.run([str(ssh), *argv], env=env.run_env, capture_output=True, text=True, timeout=10)
+    assert (res.returncode, res.stdout, res.stderr) == (0, "ran\n", "")
+    assert (env.logs / "ssh-keys").read_text(encoding="utf-8") == "/k ey\n"
 
 
 def test_deploy_checks_new_code_before_replacing(env):

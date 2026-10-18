@@ -14,9 +14,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Tests do not launch a browser: Playwright's Chromium is not installed here
+      # Chromium for the tests that render in a browser (lead magnet PDF, admin XSS)
       - name: Install
-        run: pip install -e ".[dev]"
+        run: |
+          pip install -e ".[dev]"
+          python -m playwright install --with-deps chromium
 
       - name: Tests
         run: python -m pytest -q

@@ -78,3 +78,14 @@ def _no_real_env_file():
         if hasattr(module, attr):
             setattr(module, attr, _NO_ENV_FILE)
     yield
+
+
+@pytest.fixture(scope="session")
+def chromium():
+    """Skip, not fail, where Playwright's Chromium is not installed (`python -m playwright install chromium`)."""
+    playwright = pytest.importorskip("playwright.sync_api")
+    with playwright.sync_playwright() as pw:
+        try:
+            pw.chromium.launch(headless=True).close()
+        except Exception as e:  # no browser binaries installed
+            pytest.skip(f"chromium unavailable, run `python -m playwright install chromium`: {str(e).splitlines()[0]}")

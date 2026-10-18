@@ -34,7 +34,7 @@ def example_profile(monkeypatch):
     get_profile.cache_clear()
 
 
-def test_full_flow(example_profile):
+def test_full_flow(example_profile, chromium):  # the lead magnet renders its PDF in Chromium
     profile = example_profile
     # EditorialPitcher exports into EXPORTS_DIR: it must be conftest's temporary data dir, never the live data/
     assert not EXPORTS_DIR.resolve().is_relative_to((PROJECT_ROOT / "data").resolve())
