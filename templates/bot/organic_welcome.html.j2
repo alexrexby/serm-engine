@@ -1,0 +1,12 @@
+{#- /start without a payload (organic visit, not from an article link): no lead magnet is delivered, so no
+    material is promised. subscribed=false: the gate before the subscription check; true: the greeting before
+    the offer tiers (bot/funnel.html.j2 follows). Telegram HTML, no autoescape: user input (first_name) goes through |e.
+    Context: profile, subscribed, channel, first_name. -#}
+👋 <b>Здравствуйте, {{ (first_name or "друг")|e }}!</b>
+{% if subscribed %}
+Спасибо, что читаете канал 📢 <b>{{ channel|e }}</b>. Ниже — форматы совместной работы: выберите подходящий.
+{%- else %}
+Это бот канала 📢 <b>{{ channel|e }}</b>{% if profile.telegram.channel_title %} — «{{ profile.telegram.channel_title|e }}»{% endif %}.
+
+Подпишитесь и нажмите кнопку ниже — здесь появятся форматы работы 👇
+{%- endif %}

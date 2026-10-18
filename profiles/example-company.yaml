@@ -84,5 +84,16 @@ generation:
   review_required: true     # статьи создаются черновиками (draft) и публикуются после одобрения в админке
   language: ru
 
+# schedule:                 # расписание автопилота; секции нет → вт/чт 10:30 статьи, TG пн–пт (как ниже)
+#   utc_offset_hours: 3      # часовой пояс слотов: 3 = МСК
+#   articles:                # не больше одного слота статьи в день; время — в кавычках
+#     - {days: [tue, thu], time: "10:30"}
+#   telegram:                # slot — часть ключа в data/autopilot_state.json, на живой установке не переименовывать
+#     - {day: mon, time: "11:00", slot: insight}
+#     - {day: tue, time: "13:00", slot: teaser}
+#     - {day: wed, time: "11:30", slot: case}
+#     - {day: thu, time: "13:00", slot: teaser}
+#     - {day: fri, time: "15:00", slot: vibecoding}
+
 deploy:
   server_url: null

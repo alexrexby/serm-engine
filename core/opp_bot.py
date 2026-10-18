@@ -4,7 +4,9 @@ Runs on aiogram 3.x with strict HTML formatting, deep-linking router, and Conver
 
 Deep link routes come from the profile (`lead_magnets`): /start <slug> -> the first lead magnet
 (in profile order) with a `match` substring found in the slug; anything else -> default_lead_magnet,
-logged under the raw slug ("general" when empty). Funnel buttons are tier_<id> callbacks of offer tiers.
+logged under the raw slug. /start without a payload is an organic visit (no article link): the same
+subscription gate, then the offer menu without a PDF (bot/organic_welcome.html.j2), logged as "organic".
+Funnel buttons are tier_<id> callbacks of offer tiers.
 Texts: bot/*.html.j2 (Telegram HTML, no autoescape — user input through |e), bot/buttons.yaml.j2,
 bot/alerts.yaml.j2, bot/alert_*.txt.j2.
 """
@@ -52,6 +54,8 @@ DEFAULT_CHANNEL, DEFAULT_CONTACT = _profile_defaults()
 # Deep-link payload alphabet and length (Telegram); a hand-typed /start is cut to the same before the DB
 _SLUG_UNSAFE_RE = re.compile(r"[^A-Za-z0-9_-]")
 SLUG_MAX_LEN = 64
+# bot_events.slug of /start without a payload (reader came to the bot not from an article link)
+ORGANIC_SLUG = "organic"
 
 # In-memory storage for pending lead magnet requests by user_id
 user_pending_magnet: Dict[int, str] = {}
@@ -129,11 +133,15 @@ def _buttons(profile: Any, channel_username: str, contact_username: Optional[str
     return data
 
 
-def get_subscription_keyboard(channel_username: str, profile: Optional[Any] = None) -> InlineKeyboardMarkup:
+def get_subscription_keyboard(channel_username: str, profile: Optional[Any] = None,
+                              organic: bool = False) -> InlineKeyboardMarkup:
     buttons = _buttons(_profile(profile), channel_username)
+    # Organic gate delivers no material, so its button must not promise one
+    check_sub = buttons.get("check_sub_organic", buttons["check_sub"]) if organic else buttons["check_sub"]
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=buttons["subscribe"], url=_tg_url(channel_username))],
-        [InlineKeyboardButton(text=buttons["check_sub"], callback_data="check_sub")]
+        # The organic marker travels in callback_data: process memory is lost on a bot restart
+        [InlineKeyboardButton(text=check_sub, callback_data="check_sub_organic" if organic else "check_sub")]
     ])
 
 
@@ -204,6 +212,10 @@ async def send_lead_magnet(bot: Bot, chat_id: int, magnet_info: Dict[str, Any], 
             details=magnet_info.get("filename", "")
         )
 
+    await _send_funnel(bot, chat_id, profile, channel_username)
+
+
+async def _send_funnel(bot: Bot, chat_id: int, profile: Any, channel_username: Optional[str]) -> None:
     # Offer tiers
     await bot.send_message(
         chat_id=chat_id,
@@ -211,6 +223,20 @@ async def send_lead_magnet(bot: Bot, chat_id: int, magnet_info: Dict[str, Any], 
         reply_markup=get_funnel_keyboard(profile, channel_username),
         parse_mode="HTML"
     )
+
+
+async def send_organic_menu(bot: Bot, chat_id: int, profile: Optional[Any] = None,
+                            channel_username: Optional[str] = None, first_name: Optional[str] = None):
+    """Subscribed organic visitor: a welcome without a lead magnet, then the offer tiers."""
+    profile = _profile(profile)
+    channel = channel_username or profile.telegram.channel
+    await bot.send_message(
+        chat_id=chat_id,
+        text=render("bot/organic_welcome.html.j2", profile, subscribed=True,
+                    channel=channel, first_name=first_name),
+        parse_mode="HTML"
+    )
+    await _send_funnel(bot, chat_id, profile, channel_username)
 
 
 def _tier_text(profile: Any, tier_id: str, **ctx: Any) -> str:
@@ -241,7 +267,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
         user = message.from_user
         user_id = user.id
         slug = start_slug(command.args)
-        user_pending_magnet[user_id] = slug or "general"
+        user_pending_magnet[user_id] = slug  # "" = organic visit
 
         # Log Start Event
         db.log_bot_event(
@@ -249,7 +275,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             username=user.username,
             first_name=user.first_name,
             event_type="start",
-            slug=slug or "general",
+            slug=slug or ORGANIC_SLUG,
             details="User entered via /start"
         )
 
@@ -265,9 +291,28 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
         except Exception:
             logger.exception("Bot milestone alert failed")
 
-        magnet = resolve_magnet_info(slug, exports_dir, profile)
         subscribed = await is_user_subscribed(bot, channel_username, user_id)
+        if not slug:
+            db.log_bot_event(
+                user_id=user_id,
+                username=user.username,
+                first_name=user.first_name,
+                event_type="subscribed" if subscribed else "check_sub_attempt",
+                slug=ORGANIC_SLUG,
+                details="Already subscribed on start" if subscribed else "Unsubscribed, gate displayed"
+            )
+            if subscribed:
+                await send_organic_menu(bot, message.chat.id, profile, channel_username, user.first_name)
+            else:
+                await message.answer(
+                    text=render("bot/organic_welcome.html.j2", profile, subscribed=False,
+                                channel=channel_username, first_name=user.first_name),
+                    reply_markup=get_subscription_keyboard(channel_username, profile, organic=True),
+                    parse_mode="HTML"
+                )
+            return
 
+        magnet = resolve_magnet_info(slug, exports_dir, profile)
         user_meta = {"username": user.username, "first_name": user.first_name}
 
         if subscribed:
@@ -298,13 +343,18 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
                 parse_mode="HTML"
             )
 
-    @dp.callback_query(F.data == "check_sub")
+    @dp.callback_query(F.data.in_({"check_sub", "check_sub_organic"}))
     async def cb_check_sub(callback: CallbackQuery, bot: Bot):
         user = callback.from_user
         user_id = user.id
         subscribed = await is_user_subscribed(bot, channel_username, user_id)
-        slug = user_pending_magnet.get(user_id, "general")
-        magnet = resolve_magnet_info(slug, exports_dir, profile)
+        if callback.data == "check_sub_organic":
+            slug = ""  # organic gate: never a lead magnet, even after a restart
+        else:
+            # No pending entry (e.g. the bot restarted after the gate): the default lead magnet, as before
+            slug = user_pending_magnet.get(user_id, "general")
+        magnet = resolve_magnet_info(slug, exports_dir, profile) if slug else None
+        event_slug = magnet["slug"] if magnet else ORGANIC_SLUG
 
         if subscribed:
             db.log_bot_event(
@@ -312,7 +362,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
                 username=user.username,
                 first_name=user.first_name,
                 event_type="subscribed",
-                slug=magnet["slug"],
+                slug=event_slug,
                 details="Subscribed verified via callback button"
             )
 
@@ -322,6 +372,9 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             except Exception:
                 pass
 
+            if magnet is None:
+                await send_organic_menu(bot, callback.message.chat.id, profile, channel_username, user.first_name)
+                return
             user_meta = {"username": user.username, "first_name": user.first_name}
             await send_lead_magnet(bot, callback.message.chat.id, magnet, db, user_meta, profile, channel_username)
         else:
@@ -330,7 +383,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
                 username=user.username,
                 first_name=user.first_name,
                 event_type="check_sub_attempt",
-                slug=magnet["slug"],
+                slug=event_slug,
                 details="User clicked check_sub but not subscribed"
             )
             await callback.answer(buttons["not_subscribed"], show_alert=True)
@@ -344,7 +397,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             await callback.answer()
             return
         user = callback.from_user
-        slug = user_pending_magnet.get(user.id, "general")
+        slug = user_pending_magnet.get(user.id, "general") or ORGANIC_SLUG
         db.log_bot_event(
             user_id=user.id,
             username=user.username,

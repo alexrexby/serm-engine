@@ -128,8 +128,14 @@ def test_offer_links_lead_magnet_through_bot_deeplink():
     assert profile.telegram.bot_username is None
     assert "?start=" not in _text(_generate(profile))
     with_bot = profile.model_copy(update={"telegram": profile.telegram.model_copy(update={"bot_username": "example_bot"})})
-    text = _text(_generate(with_bot))
-    assert f"https://t.me/example_bot?start={profile.default_lead_magnet}" in text
+    articles = _generate(with_bot)
+    # one deep link per platform, <platform>_<lead magnet slug>: the bot sees which article sent the reader
+    slugs = set()
+    for a in articles:
+        found = set(re.findall(r"t\.me/example_bot\?start=([A-Za-z0-9_-]+)", f"{a.content_markdown}\n{a.content_html}"))
+        assert found == {f"{a.platform}_{profile.default_lead_magnet}"}, (a.platform, found)
+        slugs |= found
+    assert len(slugs) == len(articles) == len(PLATFORMS)
 
 
 def test_profile_templates_override_builtin(tmp_path):

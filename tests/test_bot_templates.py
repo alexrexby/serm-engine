@@ -25,6 +25,7 @@ import core.alerts  # noqa: E402
 import core.opp_bot as opp_bot  # noqa: E402
 from core.db import Database  # noqa: E402
 from core.profile import PROFILES_DIR, get_profile, load_profile  # noqa: E402
+from publishers.registry import PLATFORMS  # noqa: E402
 from test_no_personal import find_markers, private_markers  # noqa: E402
 
 DATE = datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
@@ -155,6 +156,60 @@ def test_subscribed_gets_magnet_and_profile_offer_tiers(profile, alerts):
         assert tier.title in funnel.text
 
 
+def _logged_slugs(monkeypatch):
+    logged = []
+    monkeypatch.setattr(Database, "log_bot_event", lambda self, **kw: logged.append((kw["event_type"], kw["slug"])))
+    return logged
+
+
+def _pdf(profile, tmp_path):
+    (tmp_path / "campaign_x").mkdir(exist_ok=True)
+    pdf = tmp_path / "campaign_x" / profile.lead_magnet().file_prefix
+    pdf.write_bytes(b"%PDF")
+    return tmp_path
+
+
+def test_organic_start_gives_offer_menu_without_pdf(profile, alerts, monkeypatch, tmp_path):
+    # /start without a payload: subscription gate, then offer tiers; no lead magnet even when the PDF exists
+    logged = _logged_slugs(monkeypatch)
+    exports = _pdf(profile, tmp_path)
+    calls = _run(profile, [_start(1001, ""), _start(1002, "")], subscribed={1002}, exports_dir=exports)
+    names = [name for name, _ in calls]
+    assert "SendDocument" not in names
+    gate, welcome, funnel = (m for _, m in calls)
+    assert profile.lead_magnet().title not in _texts([("", gate), ("", welcome)])
+    assert [b.callback_data for row in gate.reply_markup.inline_keyboard for b in row][-1] == "check_sub_organic"
+    assert [row[0].callback_data for row in funnel.reply_markup.inline_keyboard] == [
+        f"tier_{t.id}" for t in profile.offer_tiers if t.id != "diy"]
+    assert {slug for _, slug in logged} == {opp_bot.ORGANIC_SLUG}
+    assert ("pdf_delivered", opp_bot.ORGANIC_SLUG) not in logged
+
+
+def test_organic_check_sub_gives_offer_menu_without_pdf(profile, alerts, monkeypatch, tmp_path):
+    logged = _logged_slugs(monkeypatch)
+    exports = _pdf(profile, tmp_path)
+    calls = _run(profile, [_start(1101, "")], exports_dir=exports)
+    calls = _run(profile, [_callback(1101, "check_sub")], subscribed={1101}, exports_dir=exports)
+    assert "SendDocument" not in [name for name, _ in calls]
+    assert any(getattr(m, "reply_markup", None) and m.reply_markup.inline_keyboard[0][0].callback_data.startswith("tier_")
+               for _, m in calls)
+    assert ("subscribed", opp_bot.ORGANIC_SLUG) in logged
+    assert {slug for _, slug in logged} == {opp_bot.ORGANIC_SLUG}
+
+
+@pytest.mark.parametrize("platform", list(PLATFORMS))
+def test_platform_slug_delivers_same_magnet_pdf(profile, alerts, monkeypatch, tmp_path, platform):
+    # Article deep links are <platform>_<magnet slug>: each resolves to that magnet, PDF delivered
+    logged = _logged_slugs(monkeypatch)
+    magnet = profile.lead_magnet()
+    slug = f"{platform}_{magnet.slug}"
+    info = opp_bot.resolve_magnet_info(slug, None, profile)
+    assert (info["slug"], info["title"], info["filename"]) == (magnet.slug, magnet.title, magnet.download_filename)
+    calls = _run(profile, [_start(1201, slug)], subscribed={1201}, exports_dir=_pdf(profile, tmp_path))
+    assert calls[0][0] == "SendDocument" and magnet.title in calls[0][1].caption
+    assert ("start", slug) in logged and ("pdf_delivered", magnet.slug) in logged
+
+
 def test_tier_click_alerts_and_links_from_profile(profile, alerts):
     for tier in [t for t in profile.offer_tiers if t.id != "diy"]:
         alerts.clear()
@@ -218,8 +273,9 @@ def test_start_slug_is_bounded_before_db(profile, alerts, monkeypatch):
     _run(profile, [_start(801, hostile), _start(802, "fiscal_tax-2"), _start(803, "  ")])
     assert all(len(s) <= 64 and re.fullmatch(r"[A-Za-z0-9_-]+", s) for s in logged), logged
     assert logged[0].startswith("auditscriptalert1script")
-    assert "fiscal_tax-2" in logged and "general" in logged
-    assert set(opp_bot.user_pending_magnet[uid] for uid in (801, 802, 803)) <= set(logged)
+    assert "fiscal_tax-2" in logged and opp_bot.ORGANIC_SLUG in logged
+    assert set(opp_bot.user_pending_magnet[uid] for uid in (801, 802)) <= set(logged)
+    assert opp_bot.user_pending_magnet[803] == ""  # whitespace-only payload is an organic visit
 
 
 def test_dispatcher_refuses_profile_without_lead_magnets(profile):

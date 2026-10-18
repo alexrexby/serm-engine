@@ -2,7 +2,7 @@ from core.alerts import send_telegram_alert
 """
 Autopilot Engine for SERM Distribution & Telegram Channel Automation.
 Operates on the server 24/7 inside serm-daemon:
-1. Monitors scheduled distribution slots (VC, Dzen, Spark, Executive) according to MSK business calendar.
+1. Monitors scheduled distribution slots (VC, Dzen, Spark, Executive) by the profile's calendar (profile.schedule).
 2. Runs headless browser publishers and registers draft/live URLs.
 3. Automatically triggers FastIndexer pinging (IndexNow, Google/Yandex).
 4. Dispatches scheduled expert Telegram posts and announcement teasers to the profile's channel.
@@ -23,16 +23,37 @@ from core.models import Article
 from core.indexer import FastIndexer
 from core.telegram_posts import load_posts
 from config.settings import DATA_DIR, EXPORTS_DIR, get_bot_token, load_settings
+from core.profile import DAYS, SLOT_WINDOW_MINUTES
 from publishers.registry import enabled, get_publisher
 
 logger = logging.getLogger("AutopilotEngine")
 
 STATE_FILE = DATA_DIR / "autopilot_state.json"
+MAX_FAILED_SLOTS = 3  # failed article slots in a row before the article goes to `failed`
 MSK_OFFSET = timedelta(hours=3)
 
 
 def get_msk_now() -> datetime:
     return datetime.now(timezone.utc) + MSK_OFFSET
+
+
+def due_slots(schedule, now: datetime):
+    """(article slot day "YYYY-MM-DD" or None, TG slot key or None) at local time `now`.
+    A slot HH:MM is due for SLOT_WINDOW_MINUTES from HH:MM; a window past midnight belongs to the day it started
+    (its date and weekday). The profile schema keeps the windows of each kind apart, so at most one of each matches."""
+    def started(slot_time: str) -> Optional[datetime]:
+        # the latest HH:MM at or before now — yesterday's while today's is still ahead
+        hour, minute = (int(part) for part in slot_time.split(":"))
+        start = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if start > now:
+            start -= timedelta(days=1)
+        return start if now < start + timedelta(minutes=SLOT_WINDOW_MINUTES) else None
+
+    article_day = next((start.strftime("%Y-%m-%d") for slot in schedule.articles
+                        for start in [started(slot.time)] if start and DAYS[start.weekday()] in slot.days), None)
+    tg_slot_key = next((f"{start.strftime('%Y-%m-%d')}_{slot.day}_{slot.slot}" for slot in schedule.telegram
+                        for start in [started(slot.time)] if start and DAYS[start.weekday()] == slot.day), None)
+    return article_day, tg_slot_key
 
 
 class AutopilotState:
@@ -68,6 +89,10 @@ class AutopilotEngine:
         self.profile = profile
         self.campaign_id = campaign_id or profile.campaign_id
         self.db = Database()
+
+    def local_now(self) -> datetime:
+        # Wall clock of the schedule: MSK shifted to UTC+utc_offset_hours (3 = MSK, the default)
+        return get_msk_now() + timedelta(hours=self.profile.schedule.utc_offset_hours) - MSK_OFFSET
 
     def channel(self) -> str:
         # Read fresh: the admin panel rewrites OPP_CHANNEL at runtime; key absent -> profile channel
@@ -105,7 +130,10 @@ class AutopilotEngine:
             "enabled": self.is_enabled(),
             "campaign_id": self.campaign_id,
             "schedule_mode": state.get("schedule_mode", "smart_calendar"),
+            "schedule": self.profile.schedule.summary(),
             "current_msk_time": msk_now.strftime("%Y-%m-%d %H:%M:%S MSK"),
+            # wall clock the schedule slots are in (UTC+utc_offset_hours)
+            "local_time": f"{self.local_now():%Y-%m-%d %H:%M:%S} UTC{self.profile.schedule.utc_offset_hours:+d}",
             "ready_count": len(ready_articles),
             "published_count": len(published_articles),
             "last_article_run": state.get("last_article_run"),
@@ -116,8 +144,9 @@ class AutopilotEngine:
             "history": state.get("published_history", [])[-10:]
         }
 
-    async def step_article_publication(self) -> Optional[Dict[str, Any]]:
-        """Publishes the next available article in the campaign queue."""
+    async def step_article_publication(self, slot_day: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Publishes the next available article in the campaign queue.
+        slot_day: date of the schedule slot (the worker passes it) — marked done even if publishing ends after midnight."""
         ready_articles = self.ready_articles()
 
         if not ready_articles:
@@ -130,64 +159,64 @@ class AutopilotEngine:
         target_article = ready_articles[0]
 
         logger.info(f"Autopilot: Selecting next article for [{target_article.platform}]: {target_article.title[:50]}...")
-        
-        max_retries = 3
-        last_error = None
 
-        for attempt in range(1, max_retries + 1):
-            try:
-                publisher = get_publisher(target_article.platform)
-                res = await asyncio.to_thread(publisher.publish, target_article)
+        # One attempt per slot (owner's rule): whatever the outcome the slot is done, a failed article stays
+        # `ready` for the next slot and goes to `failed` after MAX_FAILED_SLOTS failed slots in a row
+        try:
+            publisher = get_publisher(target_article.platform)
+            res = await asyncio.to_thread(publisher.publish, target_article)
+            error = None if res.success else (res.error or "Неизвестная ошибка публикации")
+        except Exception as e:
+            res, error = None, str(e)
 
-                if res.success:
-                    self.db.update_article_status(
-                        article_id=target_article.id,
-                        status=res.status,
-                        published_url=res.published_url
-                    )
-                    if res.published_url:
-                        indexer = FastIndexer()
-                        await asyncio.to_thread(indexer.ping_all, target_article.id, target_article.title, res.published_url)
+        state = AutopilotState.load()
+        msk_now = get_msk_now()
+        # the worker compares it with the slot's date; a manual run marks the schedule's local today
+        state["last_article_day"] = slot_day or self.local_now().strftime("%Y-%m-%d")
+        failures = state.get("article_failures", {})  # article_id -> failed slots in a row; absent = none yet
 
-                    # Record in state
-                    state = AutopilotState.load()
-                    msk_now = get_msk_now()
-                    state["last_article_day"] = msk_now.strftime("%Y-%m-%d")
-                    state["last_article_run"] = msk_now.isoformat()
-                    history_item = {
-                        "article_id": target_article.id,
-                        "platform": target_article.platform,
-                        "title": target_article.title,
-                        "url": res.published_url,
-                        "status": res.status,
-                        "timestamp": msk_now.isoformat()
-                    }
-                    state.setdefault("published_history", []).append(history_item)
-                    AutopilotState.save(state)
-                    logger.info(f"Autopilot: Successfully processed [{target_article.platform}] -> {res.status}")
-                    return history_item
-                else:
-                    last_error = res.error or "Неизвестная ошибка публикации"
-                    logger.warning(f"Autopilot: Attempt {attempt}/{max_retries} failed [{target_article.platform}]: {res.error}")
+        if error is None:
+            self.db.update_article_status(
+                article_id=target_article.id,
+                status=res.status,
+                published_url=res.published_url
+            )
+            failures.pop(target_article.id, None)
+            state["last_article_run"] = msk_now.isoformat()
+            history_item = {
+                "article_id": target_article.id,
+                "platform": target_article.platform,
+                "title": target_article.title,
+                "url": res.published_url,
+                "status": res.status,
+                "timestamp": msk_now.isoformat()
+            }
+            state.setdefault("published_history", []).append(history_item)
+            # saved before pinging: a failing indexer must not make the published article look unpublished
+            AutopilotState.save(state)
+            if res.published_url:
+                indexer = FastIndexer()
+                await asyncio.to_thread(indexer.ping_all, target_article.id, target_article.title, res.published_url)
+            logger.info(f"Autopilot: Successfully processed [{target_article.platform}] -> {res.status}")
+            return history_item
 
-            except Exception as e:
-                last_error = str(e)
-                logger.warning(f"Autopilot: Attempt {attempt}/{max_retries} exception [{target_article.platform}]: {e}")
-
-            if attempt < max_retries:
-                backoff_sec = attempt * 10
-                logger.info(f"Autopilot: Retrying article in {backoff_sec}s (attempt {attempt + 1}/{max_retries})...")
-                await asyncio.sleep(backoff_sec)
-
-        self.db.update_article_status(article_id=target_article.id, status="failed", error_message=str(last_error))
-        logger.error(f"Autopilot: All {max_retries} attempts failed [{target_article.platform}]: {last_error}")
+        failed = failures.pop(target_article.id, 0) + 1
+        if failed >= MAX_FAILED_SLOTS:
+            self.db.update_article_status(article_id=target_article.id, status="failed", error_message=error)
+            outcome = "статья переведена в failed"
+        else:
+            failures[target_article.id] = failed
+            outcome = "статья остаётся в очереди на следующий слот"
+        state["article_failures"] = failures
+        AutopilotState.save(state)
+        logger.error(f"Autopilot: Publication failed [{target_article.platform}] ({failed}/{MAX_FAILED_SLOTS}): {error}")
         await send_telegram_alert(
             title=f"Ошибка публикации статьи на {target_article.platform}",
-            error_message=f"Система исчерпала все {max_retries} попытки публикации. Ошибка: {last_error}",
+            error_message=f"Ошибка: {error} (неудача {failed}/{MAX_FAILED_SLOTS}) — {outcome}",
             context=f"Статья: {target_article.title}",
             level="error"
         )
-        return {"error": str(last_error), "platform": target_article.platform}
+        return {"error": error, "platform": target_article.platform, "failed_slots": failed}
 
     async def step_telegram_post(self, specific_idx: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Publishes the next planned expert Telegram post to target channel."""
@@ -246,109 +275,99 @@ class AutopilotEngine:
         for i, (anchor, url) in enumerate(links):
             text_html = text_html.replace(f"__LINK_{i}__", f'<a href="{url}">{anchor}</a>')
 
-        max_retries = 3
-        last_error = None
-
-        for attempt in range(1, max_retries + 1):
+        # One attempt per slot: a failed post keeps its idx, the next slot sends it
+        try:
+            from aiogram import Bot
+            bot = Bot(token=token)
             try:
-                from aiogram import Bot
-                bot = Bot(token=token)
                 await bot.send_message(
                     chat_id=channel,
                     text=text_html,
                     parse_mode="HTML",
                     disable_web_page_preview=False
                 )
+            finally:
                 await bot.session.close()
+        except Exception as e:
+            logger.error(f"Autopilot: Failed to post to {channel}: {e}")
+            await send_telegram_alert(
+                title="Ошибка отправки поста в Telegram-канал",
+                error_message=f"Ошибка: {e} — пост уйдёт в следующий слот",
+                context=f"Канал: {channel}, Пост: {post_data.get('title', 'Без названия')}",
+                level="error"
+            )
+            return {"error": str(e)}
 
-                # Advance index
-                msk_now = get_msk_now()
-                state["last_tg_run"] = msk_now.isoformat()
-                state["next_tg_post_idx"] = idx + 1
-                state.setdefault("published_history", []).append({
-                    "type": "telegram_post",
-                    "post_id": post_data["id"],
-                    "title": post_data["title"],
-                    "channel": channel,
-                    "timestamp": msk_now.isoformat()
-                })
-                AutopilotState.save(state)
-                logger.info(f"Autopilot: Successfully posted to Telegram channel {channel}: {post_data['title']}")
-                return {"success": True, "post": post_data["title"]}
+        # Advance index
+        msk_now = get_msk_now()
+        state["last_tg_run"] = msk_now.isoformat()
+        state["next_tg_post_idx"] = idx + 1
+        state.setdefault("published_history", []).append({
+            "type": "telegram_post",
+            "post_id": post_data["id"],
+            "title": post_data["title"],
+            "channel": channel,
+            "timestamp": msk_now.isoformat()
+        })
+        AutopilotState.save(state)
+        logger.info(f"Autopilot: Successfully posted to Telegram channel {channel}: {post_data['title']}")
+        return {"success": True, "post": post_data["title"]}
 
-            except Exception as e:
-                last_error = e
-                logger.warning(f"Autopilot: Attempt {attempt}/{max_retries} failed to post to {channel}: {e}")
-                if attempt < max_retries:
-                    backoff_sec = attempt * 5
-                    logger.info(f"Autopilot: Retrying TG post in {backoff_sec}s (attempt {attempt + 1}/{max_retries})...")
-                    await asyncio.sleep(backoff_sec)
 
-        logger.error(f"Autopilot: All {max_retries} attempts failed to post to {channel}: {last_error}")
-        await send_telegram_alert(
-            title="Ошибка отправки поста в Telegram-канал",
-            error_message=f"Система исчерпала все {max_retries} попытки отправки. Ошибка: {last_error}",
-            context=f"Канал: {channel}, Пост: {post_data.get('title', 'Без названия')}",
-            level="error"
-        )
-        return {"error": str(last_error)}
+def _mark_slot(key: str, value: str) -> None:
+    state = AutopilotState.load()
+    state[key] = value
+    AutopilotState.save(state)
 
 
 async def periodic_autopilot_worker(engine: AutopilotEngine, check_interval_seconds: int = 120):
     """
     Background loop running in serm-daemon supervisor.
-    Checks MSK business calendar every 2 minutes:
-    - Articles on VC/Dzen: Tuesdays & Thursdays at 10:30 MSK
+    Checks the profile's calendar (profile.schedule, local time) every 2 minutes. Without a schedule section:
+    - Articles: Tuesdays & Thursdays at 10:30 MSK
     - Telegram posts on the profile's channel, next post of telegram/posts.yaml.j2 in each slot:
         * Monday 11:00 MSK
         * Tuesday 13:00 MSK (after the morning article)
         * Wednesday 11:30 MSK
         * Thursday 13:00 MSK (after the morning article)
         * Friday 15:00 MSK
+    A done slot is marked in the state file (last_article_day / last_tg_slot), so a restart inside the window
+    does not publish twice.
     """
     logger.info("Autopilot smart-calendar worker loop initialized.")
     while True:
         try:
             if engine.is_enabled():
-                msk = get_msk_now()
-                weekday = msk.weekday()  # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Sat, 6=Sun
-                hour = msk.hour
-                minute = msk.minute
-                today_str = msk.strftime("%Y-%m-%d")
+                local = engine.local_now()
+                article_day, tg_slot_key = due_slots(engine.profile.schedule, local)
 
                 state = AutopilotState.load()
 
-                # --- 1. Article Publication Slots (Tue 10:30 MSK, Thu 10:30 MSK) ---
-                if weekday in (1, 3) and hour == 10 and minute >= 30:
-                    if state.get("last_article_day") != today_str:
-                        logger.info(f"Autopilot slot match: Article on {today_str} (weekday={weekday}, time={hour}:{minute:02d} MSK)")
-                        await engine.step_article_publication()
+                # --- 1. Article Publication Slots ---
+                if article_day:
+                    if state.get("last_article_day") != article_day:
+                        logger.info(f"Autopilot slot match: Article on {article_day} (time={local:%H:%M} UTC{engine.profile.schedule.utc_offset_hours:+d})")
+                        try:
+                            await engine.step_article_publication(slot_day=article_day)
+                        except Exception:
+                            _mark_slot("last_article_day", article_day)  # one attempt per slot, even a crashed one
+                            raise
+                        # publishing holds the loop for minutes (browser, retries): a TG slot due before it still goes
+                        # (late), otherwise the one whose window opened meanwhile
+                        if not tg_slot_key or state.get("last_tg_slot") == tg_slot_key:
+                            _, tg_slot_key = due_slots(engine.profile.schedule, engine.local_now())
 
                 # --- 2. Telegram Channel Slots ---
-                tg_slot_key = None
-                # Monday 11:00 MSK
-                if weekday == 0 and hour == 11 and minute >= 0:
-                    tg_slot_key = f"{today_str}_mon_insight"
-                # Tuesday 13:00 MSK (after Tuesday morning article)
-                elif weekday == 1 and hour == 13 and minute >= 0:
-                    tg_slot_key = f"{today_str}_tue_teaser"
-                # Wednesday 11:30 MSK
-                elif weekday == 2 and hour == 11 and minute >= 30:
-                    tg_slot_key = f"{today_str}_wed_case"
-                # Thursday 13:00 MSK (after Thursday morning article)
-                elif weekday == 3 and hour == 13 and minute >= 0:
-                    tg_slot_key = f"{today_str}_thu_teaser"
-                # Friday 15:00 MSK
-                elif weekday == 4 and hour == 15 and minute >= 0:
-                    tg_slot_key = f"{today_str}_fri_vibecoding"
-
                 if tg_slot_key and state.get("last_tg_slot") != tg_slot_key:
                     logger.info(f"Autopilot slot match: TG post for slot {tg_slot_key}")
-                    res = await engine.step_telegram_post()
-                    if res and (res.get("success") or res.get("skip_slot")):
-                        state = AutopilotState.load()
-                        state["last_tg_slot"] = tg_slot_key
-                        AutopilotState.save(state)
+                    try:
+                        res = await engine.step_telegram_post()
+                    except Exception:
+                        _mark_slot("last_tg_slot", tg_slot_key)
+                        raise
+                    # sent, skipped or failed (one attempt per slot); None = nothing to send yet (no token/posts)
+                    if res is not None:
+                        _mark_slot("last_tg_slot", tg_slot_key)
 
         except Exception as e:
             logger.error(f"Error in autopilot calendar loop: {e}")

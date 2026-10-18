@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, PrivateAttr, StrictInt, ValidationError, field_validator,
+                      model_validator)
 
 logger = logging.getLogger("Profile")
 
@@ -156,6 +157,108 @@ class GenerationSettings(_Strict):
     language: str = "ru"
 
 
+Day = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # index = datetime.weekday()
+DAY_LABELS = {"mon": "пн", "tue": "вт", "wed": "ср", "thu": "чт", "fri": "пт", "sat": "сб", "sun": "вс"}
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+# Part of the autopilot state key <date>_<day>_<slot>
+_TG_SLOT_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
+# A slot HH:MM stays due this long: longer than any check interval and than a typical publication
+SLOT_WINDOW_MINUTES = 60
+WEEK_MINUTES = 7 * 24 * 60
+
+
+def _time_value(value):
+    if isinstance(value, int) and not isinstance(value, bool):
+        raise ValueError('time must be a quoted "HH:MM" string (YAML reads unquoted 10:30 as the number 630)')
+    if not isinstance(value, str) or not _TIME_RE.match(value):
+        raise ValueError('time must be "HH:MM", 00:00-23:59')
+    return value
+
+
+def _check_windows(starts: List[tuple], what: str) -> None:
+    """Windows of (day, "HH:MM") slots must not overlap on the weekly clock (Sunday night runs into Monday):
+    the state keeps one mark per kind, two due slots would alternate it."""
+    def minute(start):
+        hour, mins = (int(part) for part in start[1].split(":"))
+        return DAYS.index(start[0]) * 24 * 60 + hour * 60 + mins
+
+    ordered = sorted(starts, key=minute)
+    for prev, nxt in zip(ordered, ordered[1:] + ordered[:1]):
+        if len(ordered) > 1 and (minute(nxt) - minute(prev)) % WEEK_MINUTES < SLOT_WINDOW_MINUTES:
+            raise ValueError(f"{what}: slots '{prev[0]} {prev[1]}' and '{nxt[0]} {nxt[1]}' are less than "
+                             f"{SLOT_WINDOW_MINUTES} min apart, their windows would overlap")
+
+
+class ArticleSlot(_Strict):
+    days: List[Day] = Field(min_length=1)
+    time: str
+
+    @field_validator("time", mode="before")
+    @classmethod
+    def _check_time(cls, value):
+        return _time_value(value)
+
+
+class TelegramSlot(_Strict):
+    day: Day
+    time: str
+    slot: str  # written to autopilot state as <date>_<day>_<slot> — never rename on a live installation
+
+    @field_validator("time", mode="before")
+    @classmethod
+    def _check_time(cls, value):
+        return _time_value(value)
+
+    @field_validator("slot")
+    @classmethod
+    def _check_slot(cls, value: str) -> str:
+        if not _TG_SLOT_RE.match(value):
+            raise ValueError("slot must be lowercase latin, digits or _")
+        return value
+
+
+# No `schedule` section = the calendar the autopilot always had (state keys mon_insight … fri_vibecoding)
+DEFAULT_ARTICLE_SLOTS = [{"days": ["tue", "thu"], "time": "10:30"}]
+DEFAULT_TELEGRAM_SLOTS = [
+    {"day": "mon", "time": "11:00", "slot": "insight"},
+    {"day": "tue", "time": "13:00", "slot": "teaser"},
+    {"day": "wed", "time": "11:30", "slot": "case"},
+    {"day": "thu", "time": "13:00", "slot": "teaser"},
+    {"day": "fri", "time": "15:00", "slot": "vibecoding"},
+]
+
+
+class ScheduleSettings(_Strict):
+    """Autopilot calendar in local time UTC+utc_offset_hours. A slot HH:MM is due for SLOT_WINDOW_MINUTES from HH:MM
+    (past midnight too — the window belongs to the day it started)."""
+    utc_offset_hours: StrictInt = Field(3, ge=-12, le=14)  # strict: YAML `true` / "3" is an error, not UTC+1
+    articles: List[ArticleSlot] = Field(default_factory=lambda: [ArticleSlot(**s) for s in DEFAULT_ARTICLE_SLOTS])
+    telegram: List[TelegramSlot] = Field(default_factory=lambda: [TelegramSlot(**s) for s in DEFAULT_TELEGRAM_SLOTS])
+
+    @model_validator(mode="after")
+    def _check_slots(self) -> "ScheduleSettings":
+        # Owner's rule: at most one article a day per platform account (state marks the article slot by date)
+        days = [day for slot in self.articles for day in slot.days]
+        for day in DAYS:
+            if days.count(day) > 1:
+                raise ValueError(f"articles: '{day}' is listed {days.count(day)} times, at most one article slot a day")
+        _check_windows([(day, slot.time) for slot in self.articles for day in slot.days], "articles")
+        _require_unique([f"{s.day}_{s.slot}" for s in self.telegram], "telegram slot")
+        _check_windows([(s.day, s.time) for s in self.telegram], "telegram")
+        return self
+
+    def summary(self) -> str:
+        """Human-readable line for /api/autopilot/status and `cli.py doctor`."""
+        def days(names):
+            return ", ".join(DAY_LABELS[d] for d in DAYS if d in names)
+
+        articles = "; ".join(f"{days(s.days)} {s.time}" for s in self.articles) or "нет"
+        telegram = ", ".join(f"{DAY_LABELS[s.day]} {s.time}"
+                             for s in sorted(self.telegram, key=lambda s: (DAYS.index(s.day), s.time))) or "нет"
+        return f"Статьи: {articles}; Telegram: {telegram} (UTC{self.utc_offset_hours:+d})"
+
+
 class VoiceForms:
     """Pronoun helpers for templates: {{ v.I }}, {{ v.my }}, {{ v.we_or_I }} — no `if kind` in templates."""
 
@@ -192,6 +295,7 @@ class Profile(_Strict):
     templates_dir: Optional[Path] = None
     deploy: DeploySettings = Field(default_factory=DeploySettings)
     generation: GenerationSettings = Field(default_factory=GenerationSettings)
+    schedule: ScheduleSettings = Field(default_factory=ScheduleSettings)
 
     _source_path: Optional[Path] = PrivateAttr(default=None)
 

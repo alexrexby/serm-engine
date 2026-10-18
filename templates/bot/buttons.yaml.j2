@@ -1,5 +1,6 @@
 {#- Keyboards and callback popups; YAML after rendering (profile/config values only, no user input).
     Context: profile, channel, channel_url, contact, contact_url.
+    check_sub_organic: the gate button of /start without a payload (no material follows); optional, default check_sub.
     funnel: buttons under the offer message, callback_data tier_<id>, in this order;
     Entry keys: id; button (default: tier cta, else title); reply_button; reply_url (default: tier url,
     else the contact); lead (default true: alert the admin about a commercial lead). Profile texts are
@@ -7,6 +8,7 @@
     The diy tier is what the user has just received, so it gets no button. -#}
 subscribe: "📢 Подписаться на канал {{ channel }}"
 check_sub: "✅ Проверить подписку и получить материал"
+check_sub_organic: "✅ Проверить подписку"
 sub_confirmed: "✅ Подписка подтверждена!"
 not_subscribed: "Подписка на канал {{ channel }} пока не найдена.\n\nПодпишитесь и нажмите кнопку ещё раз — материал придёт сразу."
 funnel:

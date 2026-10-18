@@ -1,5 +1,7 @@
 {#- Offer block appended after article bodies (template and llm modes), shared with bot/lead magnets.
     Required context: profile. Optional: brand (signature, default profile.display_name), v (voice forms).
+    platform (article key): the bot deep link is <platform>_<lead magnet slug>, so /start shows where
+    the reader came from; the lead magnet still resolves by its `match` substring.
     Iterates profile.offer_tiers; links come only from the profile, never from generated text. -#}
 {%- set voice = v if v is defined else profile.v -%}
 {%- set signature = brand if brand is defined else profile.display_name -%}
@@ -12,7 +14,7 @@
 
 {% endfor -%}
 {% if magnet and tg.bot_username -%}
-Бесплатно: «{{ magnet.title }}» — [забрать в Telegram-боте]({{ deeplink(magnet.slug) }}).
+Бесплатно: «{{ magnet.title }}» — [забрать в Telegram-боте]({{ deeplink((platform ~ "_" if platform is defined else "") ~ magnet.slug) }}).
 
 {% endif -%}
 {% if tg.channel.startswith("@") -%}

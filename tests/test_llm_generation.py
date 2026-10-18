@@ -198,7 +198,7 @@ def test_good_answer_is_draft_with_offer_from_template(provider, alerts, tmp_pat
     [article] = content.articles(campaign(), profile, client=client())
     assert len(provider.requests) == 1
     assert article.status == "draft" and article.error_message is None  # review_required by default
-    assert "https://t.me/example_test_bot?start=audit" in article.content_markdown  # offer partial, not the model
+    assert f"https://t.me/example_test_bot?start={platform}_audit" in article.content_markdown  # offer partial, not the model
     assert "Иван Петров финансист" in article.tags  # profile aliases
     assert article.content_html.startswith("<h1>")
 

@@ -7,6 +7,6 @@
 {%- if profile.offer_tiers %}<ol>
 {%- for tier in profile.offer_tiers %}<li><strong>{{ tier.title }}.</strong> {{ tier.text }}{% if tier.url %} <a href='{{ tier.url }}'>{{ tier.cta or tier.url }}</a>{% endif %}</li>{% endfor -%}
 </ol>{% endif -%}
-{%- if magnet and tg.bot_username %}<p>Бесплатно: «{{ magnet.title }}» — <a href='{{ deeplink(magnet.slug) }}'>забрать в Telegram-боте</a>.</p>{% endif -%}
+{%- if magnet and tg.bot_username %}<p>Бесплатно: «{{ magnet.title }}» — <a href='{{ deeplink((platform ~ "_" if platform is defined else "") ~ magnet.slug) }}'>забрать в Telegram-боте</a>.</p>{% endif -%}
 <p>{% if tg.channel.startswith("@") %}Канал: <a href='https://t.me/{{ tg.channel[1:] }}'>{{ tg.channel }}</a>. {% endif -%}
 Вопросы — напишите {{ voice.to_me }}: <a href='https://t.me/{{ tg.contact[1:] }}'>{{ tg.contact }}</a>.</p><p><em>— {{ signature }}</em></p>

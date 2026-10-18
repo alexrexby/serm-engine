@@ -161,6 +161,33 @@ def test_telegram_post_from_profile_templates(monkeypatch, tmp_path):
     assert autopilot.AutopilotState.load()["next_tg_post_idx"] == 1
 
 
+
+def test_failed_telegram_post_is_one_attempt_and_keeps_idx(monkeypatch, tmp_path, isolated):
+    sent = []
+
+    class FailingBot:
+        def __init__(self, token):
+            self.session = self
+
+        async def send_message(self, **kwargs):
+            sent.append(kwargs)
+            raise RuntimeError("chat not found")
+
+        async def close(self):
+            pass
+
+    import aiogram
+    monkeypatch.setattr(aiogram, "Bot", FailingBot)
+    monkeypatch.setenv("OPP_BOT_TOKEN", "123456:" + "x" * 35)
+    engine = autopilot.AutopilotEngine(profile=_own_posts_profile(tmp_path, "example-company"))
+
+    res = asyncio.run(engine.step_telegram_post())
+
+    assert res == {"error": "chat not found"}
+    assert len(sent) == 1
+    assert len(isolated) == 1 and "chat not found" in isolated[0]["error_message"]
+    assert autopilot.AutopilotState.load().get("next_tg_post_idx", 0) == 0
+
 def _own_posts_profile(tmp_path, name):
     """Copy of an example profile that ships its own telegram templates (as a real install would)."""
     import shutil

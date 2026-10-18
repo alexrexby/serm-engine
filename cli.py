@@ -515,6 +515,7 @@ def cmd_doctor(args):
             add("FAIL", "Шаблоны", "; ".join(broken))
         else:
             add("OK", "Шаблоны", f"{len(names)} компилируются")
+        add("OK", "Расписание", profile.schedule.summary())
 
     # Telegram bot and channel
     token = settings.bot_token.get_secret_value() if settings else ""

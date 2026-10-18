@@ -365,7 +365,7 @@ def _article_markdown(title: str, lead: str, body: str, offer_md: str) -> str:
 def build_article(profile: Profile, campaign: Campaign, platform: str, draft: Optional[ArticleDraft],
                   raw_text: str, issues: List[Dict[str, Any]]) -> Article:
     spec = platform_context(platform)
-    offer_md = render("partials/offer.md.j2", profile, v=profile.v)
+    offer_md = render("partials/offer.md.j2", profile, v=profile.v, platform=platform)
     if draft is not None:
         title, lead, body = draft.title.strip(), draft.lead.strip(), draft.body_markdown
         tags = []
