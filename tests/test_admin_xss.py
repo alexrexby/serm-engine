@@ -50,6 +50,11 @@ def _seed(profile) -> None:
     db.log_bot_event(user_id=1, username=None, first_name=payload("first_name"), event_type="start",
                      slug=payload("slug"), details=payload("details"))
     db.log_bot_event(user_id=2, username=None, first_name="x", event_type=payload("event_type"))
+    # leads: name/slug from Telegram, product and status as stored (the card of the lead list)
+    lead_id = db.upsert_lead(3, None, payload("lead_name"), payload("lead_slug"), "tier_x")
+    db.set_lead_status(lead_id, "new", "sale", "closed_at", product=payload("lead_product"))
+    odd_id = db.upsert_lead(4, None, "y", "vc", "tier_x")
+    db.set_lead_status(odd_id, "new", payload("lead_status"))
 
     campaign = profile.campaign_id
     db.add_article(Article(id="xss-pub", campaign_id=campaign, platform="vc", title=payload("title"),
@@ -140,7 +145,8 @@ def test_api_data_is_rendered_as_text(profile):
     assert result["injected"] == 0
     # positive control: every sink really received the payload and shows it as text
     for tag in ("first_name", "slug", "details", "event_type", "title", "applied_title",
-                "rss_title", "source", "hole", "solution", "impact", "prompt", "lm"):
+                "rss_title", "source", "hole", "solution", "impact", "prompt", "lm",
+                "lead_name", "lead_slug", "lead_product", "lead_status"):
         assert payload(tag) in result["text"], tag
     # safe markup of the article preview is kept, with its classes
     assert result["previewParagraphs"] >= 1

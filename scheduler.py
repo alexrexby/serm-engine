@@ -26,6 +26,7 @@ from core.db import Database
 from core.opp_bot import create_opp_dispatcher, poll_opp_bot, DEFAULT_CHANNEL, DEFAULT_CONTACT
 from core.admin import create_admin_app
 from core.autopilot import AutopilotEngine, periodic_autopilot_worker
+from core.lead_status import periodic_lead_reminders
 from config.settings import DATA_DIR, EXPORTS_DIR, load_settings
 from core.profile import ProfileError, get_profile, missing_own_templates, profile_summary
 
@@ -242,6 +243,8 @@ async def main():
 
     # 3. Background healthchecks
     healthcheck_task = asyncio.create_task(periodic_healthcheck(interval_seconds=1800))
+    # Lead status reminders to the owner (the standalone run_opp_bot sends none, on purpose)
+    lead_reminder_task = asyncio.create_task(periodic_lead_reminders(interval_s=1800))
 
     # 4. Background Autopilot Worker (smart business calendar)
     autopilot_engine = AutopilotEngine(campaign_id)
@@ -263,6 +266,7 @@ async def main():
 
     await stop_event.wait()
     healthcheck_task.cancel()
+    lead_reminder_task.cancel()
     autopilot_task.cancel()
     await supervisor.stop()
     await runner.cleanup()

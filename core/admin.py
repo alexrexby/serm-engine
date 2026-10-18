@@ -50,6 +50,9 @@ SECRET_KEY_MARKERS = ("TOKEN", "PASSWORD", "SECRET", "API_KEY")
 EXTENSION_DIR = BASE_DIR / "extension"
 # Zip cached by older versions (could carry a hardcoded admin token); now built in memory per request
 STALE_EXTENSION_ZIP = EXPORTS_DIR / "serm_cookie_sync_extension.zip"
+# Lead rows in /api/analytics (read-only view of what the owner marked in Telegram)
+LEAD_FIELDS = ("id", "user_id", "username", "first_name", "slug", "status", "created_at", "status_at",
+               "product", "amount")
 # Bot restarts after saving secrets: the loop keeps only a weak reference to a task
 _RESTART_TASKS: set = set()
 
@@ -776,13 +779,15 @@ class AdminController:
         breakdown = db.get_slug_breakdown()
         recommendations = db.get_content_strategy_recommendations()
         recent_events = db.get_recent_events(limit=50)
+        leads = [{key: lead[key] for key in LEAD_FIELDS} for lead in db.list_leads(50)]
 
         return web.json_response({
             "success": True,
             "summary": summary,
             "breakdown": breakdown,
             "recommendations": recommendations,
-            "recent_events": recent_events
+            "recent_events": recent_events,
+            "leads": leads
         })
 
 

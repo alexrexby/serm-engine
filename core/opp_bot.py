@@ -32,6 +32,7 @@ from aiogram.enums import ChatMemberStatus
 from jinja2 import TemplateNotFound
 
 from core.db import Database
+from core.lead_status import alert_keyboard, lead_router
 from core.profile import ProfileError, get_profile, load_profile, resolve_profile_path
 from core.templating import render
 
@@ -139,6 +140,13 @@ def _buttons(profile: Any, channel_username: str, contact_username: Optional[str
     return data
 
 
+def lead_interests(profile: Any, channel_username: Optional[str] = None) -> Dict[str, str]:
+    """leads.interest ('tier_<id>') -> what the lead alert names: the entry's interest, else the tier title."""
+    buttons = _buttons(profile, channel_username or profile.telegram.channel)
+    return {f"tier_{entry['id']}": entry["interest"] or (entry["tier"].title if entry["tier"] else entry["id"])
+            for entry in buttons["funnel"]}
+
+
 def get_subscription_keyboard(channel_username: str, profile: Optional[Any] = None,
                               organic: bool = False) -> InlineKeyboardMarkup:
     buttons = _buttons(_profile(profile), channel_username)
@@ -162,15 +170,17 @@ def get_funnel_keyboard(profile: Optional[Any] = None, channel_username: Optiona
     ])
 
 
-def _alert(profile: Any, kind: str, message: str, **ctx: Any) -> None:
-    """Fire-and-forget admin alert; texts from bot/alerts.yaml.j2."""
+def _alert(profile: Any, kind: str, message: str, reply_markup: Optional[InlineKeyboardMarkup] = None,
+           **ctx: Any) -> None:
+    """Fire-and-forget admin alert; texts from bot/alerts.yaml.j2. reply_markup is passed on only when set."""
     from core.alerts import send_telegram_alert
     meta = yaml.safe_load(render("bot/alerts.yaml.j2", profile, **ctx))[kind]
     asyncio.create_task(send_telegram_alert(
         title=meta["title"],
         error_message=message,
         context=meta.get("context"),
-        level="milestone"
+        level="milestone",
+        **({"reply_markup": reply_markup} if reply_markup is not None else {})
     ))
 
 
@@ -281,6 +291,8 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
     db = Database()
     buttons = _buttons(profile, channel_username, contact_username)
     funnel = {entry["id"]: entry for entry in buttons["funnel"]}
+    # Owner's lead status buttons (core/lead_status.py); removing the feature = removing this line
+    dp.include_router(lead_router(profile, db, lead_interests(profile, channel_username)))
 
     @dp.message(CommandStart())
     async def cmd_start(message: Message, command: CommandObject, bot: Bot):
@@ -447,10 +459,18 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
 
         tier = entry["tier"]
         if entry["lead"]:
+            status_buttons = None
+            try:
+                lead_id = db.upsert_lead(user.id, user.username, user.first_name, slug, f"tier_{tier_id}")
+                status_buttons = alert_keyboard(profile, db.get_lead(lead_id))
+            except Exception:
+                # Lead status is the owner's bookkeeping: its failure must not cost the alert
+                logger.exception(f"Bot lead status failed (tier_{tier_id}, user {user.id})")
             try:
                 _alert(profile, "lead", render(
                     "bot/alert_lead.txt.j2", profile, username=user.username, first_name=user.first_name,
-                    user_id=user.id, interest=entry["interest"] or (tier.title if tier else tier_id), slug=slug))
+                    user_id=user.id, interest=entry["interest"] or (tier.title if tier else tier_id), slug=slug),
+                    reply_markup=status_buttons)
             except Exception:
                 # The lead alert is the owner's money signal: never lose it silently
                 logger.exception(f"Bot lead alert failed (tier_{tier_id}, user {user.id})")

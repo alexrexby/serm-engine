@@ -6,7 +6,7 @@ import sys
 import logging
 import asyncio
 from html import escape
-from typing import Optional, Set
+from typing import Any, Optional, Set
 from aiogram import Bot
 
 from config import settings
@@ -41,11 +41,13 @@ async def send_telegram_alert(
     title: str,
     error_message: str,
     context: Optional[str] = None,
-    level: str = "error"
+    level: str = "error",
+    reply_markup: Optional[Any] = None
 ) -> bool:
     """
     Sends structured alert message to the administrator.
     Levels: 'error', 'warning', 'milestone', 'info'
+    reply_markup: inline keyboard under the alert (lead status buttons); omitted from the request when None.
     """
     token = get_bot_token()
     admin_id = get_admin_id()
@@ -66,12 +68,30 @@ async def send_telegram_alert(
             await bot.send_message(
                 chat_id=admin_id,
                 text=text,
-                parse_mode="HTML"
+                parse_mode="HTML",
+                **({"reply_markup": reply_markup} if reply_markup is not None else {})
             )
         logger.info(f"Telegram alert sent to admin {admin_id}: {title}")
         return True
     except Exception as e:
         logger.error(f"Failed to send Telegram alert: {e}")
+        return False
+
+
+async def send_admin_message(text_html: str, reply_markup: Optional[Any] = None) -> bool:
+    """A ready Telegram HTML message to the administrator (lead cards, reminders), without the alert frame.
+    The caller escapes user input; same token and admin id as the alerts."""
+    token = get_bot_token()
+    admin_id = get_admin_id()
+    if not token or not admin_id:
+        logger.warning("Admin message skipped: token or admin_id missing.")
+        return False
+    try:
+        async with Bot(token=token) as bot:
+            await bot.send_message(chat_id=admin_id, text=text_html, parse_mode="HTML", reply_markup=reply_markup)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send admin message: {e}")
         return False
 
 

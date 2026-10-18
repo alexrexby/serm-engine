@@ -949,7 +949,7 @@
           📊 Аналитика воронки
         </h2>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-          Критерий принятия решений: выборка 50–100 уникальных переходов &bull; Воронка: Публикация &rarr; Переход в бота &rarr; Подписка на {{ channel }} &rarr; Выдача PDF &rarr; Заявки
+          Критерий принятия решений: выборка 50–100 уникальных переходов &bull; Воронка: Публикация &rarr; Переход в бота &rarr; Подписка на {{ channel }} &rarr; Выдача PDF &rarr; Заявки &rarr; Связь &rarr; Созвон &rarr; Продажа
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -1085,12 +1085,42 @@
               <th style="padding: 10px; text-align: center;">% подписок</th>
               <th style="padding: 10px; text-align: center;">PDF</th>
               <th style="padding: 10px; text-align: center;">Заявки</th>
+              <th style="padding: 10px; text-align: center;">Связь</th>
+              <th style="padding: 10px; text-align: center;">Созвоны</th>
+              <th style="padding: 10px; text-align: center;">Продажи</th>
+              <th style="padding: 10px; text-align: center;">Выручка</th>
               <th style="padding: 10px; text-align: center;">% заявок</th>
               <th style="padding: 10px; text-align: right;">Оценка</th>
             </tr>
           </thead>
           <tbody id="topicBreakdownTbody">
-            <tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка аналитики по темам...</td></tr>
+            <tr><td colspan="12" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка аналитики по темам...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LEADS: status marked by the owner in Telegram (read-only here) -->
+    <div class="card" style="margin-bottom: 22px;">
+      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>🤝 Лиды: что было после заявки</span>
+        <span style="font-size: 11px; color: var(--text-muted);" id="leadsCountBadge">0 лидов</span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Статусы отмечаются кнопками под оповещением о заявке в Telegram и командой /leads в боте.</div>
+      <div style="overflow-x: auto; max-height: 380px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--card-border); text-align: left; color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
+              <th style="padding: 8px 10px;">Заявка</th>
+              <th style="padding: 8px 10px;">Кто</th>
+              <th style="padding: 8px 10px;">Тема / Источник</th>
+              <th style="padding: 8px 10px;">Статус</th>
+              <th style="padding: 8px 10px;">Продукт</th>
+              <th style="padding: 8px 10px; text-align: right;">Сумма</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTbody">
+            <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка лидов...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1994,6 +2024,15 @@
     }
   }
 
+  const LEAD_STATUS_LABELS = {
+    new: 'Новая заявка', no_contact: 'Не вышел на связь', contacted: 'На связи', call_set: 'Созвон назначен',
+    no_show: 'Не пришёл на созвон', call_done: 'Созвон состоялся', thinking: 'Думает', sale: 'Продажа', no_sale: 'Отказ'
+  };
+
+  function money(value) {
+    return Number(value || 0).toLocaleString('ru-RU');
+  }
+
   function renderAnalytics(data) {
     const s = data.summary || {};
     const starts = s.unique_starts || 0;
@@ -2039,6 +2078,15 @@
     const pctSubs = starts > 0 ? Math.round((subs / starts) * 100) : 0;
     const pctPdfs = starts > 0 ? Math.round((pdfs / starts) * 100) : 0;
     const pctLeads = starts > 0 ? Math.round((leads / starts) * 100) : 0;
+    // After the lead click: statuses the owner marks in Telegram (leads table)
+    const contacted = s.unique_contacted || 0;
+    const callsSet = s.unique_calls_set || 0;
+    const callsDone = s.unique_calls_done || 0;
+    const sales = s.unique_sales || 0;
+    const pctContacted = starts > 0 ? Math.round((contacted / starts) * 100) : 0;
+    const pctCallsSet = starts > 0 ? Math.round((callsSet / starts) * 100) : 0;
+    const pctCallsDone = starts > 0 ? Math.round((callsDone / starts) * 100) : 0;
+    const pctSales = starts > 0 ? Math.round((sales / starts) * 100) : 0;
 
     funnelContainer.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -2081,6 +2129,46 @@
             <div style="height: 100%; width: ${pctLeads}%; background: #f59e0b; border-radius: 5px; transition: width 0.5s;"></div>
           </div>
         </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">5. Вышли на связь</span>
+            <strong>${esc(contacted)} чел. (${pctContacted}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctContacted}%; background: #fb923c; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">6. Назначен созвон</span>
+            <strong>${esc(callsSet)} чел. (${pctCallsSet}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctCallsSet}%; background: #f472b6; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">7. Созвон состоялся</span>
+            <strong>${esc(callsDone)} чел. (${pctCallsDone}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctCallsDone}%; background: #c084fc; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">8. Продажа</span>
+            <strong>${esc(sales)} чел. (${pctSales}%) &middot; ${esc(money(s.revenue))}</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctSales}%; background: #22c55e; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
       </div>
     `;
 
@@ -2106,7 +2194,7 @@
     const tbody = document.getElementById('topicBreakdownTbody');
     const breakdown = data.breakdown || [];
     if (breakdown.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Переходов по темам пока не зафиксировано</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px; color: var(--text-muted);">Переходов по темам пока не зафиксировано</td></tr>';
     } else {
       tbody.innerHTML = breakdown.map(b => {
         let badge = '';
@@ -2129,8 +2217,35 @@
             <td style="padding: 10px; text-align: center; font-weight: 600;">${esc(b.cr_sub)}%</td>
             <td style="padding: 10px; text-align: center; color: #818cf8;">${esc(b.pdfs)}</td>
             <td style="padding: 10px; text-align: center; color: #f59e0b; font-weight: 700;">${esc(b.leads)}</td>
+            <td style="padding: 10px; text-align: center;">${esc(b.contacted || 0)}</td>
+            <td style="padding: 10px; text-align: center;">${esc(b.calls_set || 0)}</td>
+            <td style="padding: 10px; text-align: center; color: #22c55e; font-weight: 700;">${esc(b.sales || 0)}</td>
+            <td style="padding: 10px; text-align: center; white-space: nowrap;">${esc(money(b.revenue))}</td>
             <td style="padding: 10px; text-align: center; font-weight: 600;">${esc(b.cr_lead)}%</td>
             <td style="padding: 10px; text-align: right;">${badge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Render Leads (read-only: statuses are set in Telegram)
+    const leadsTbody = document.getElementById('leadsTbody');
+    const leadRows = data.leads || [];
+    document.getElementById('leadsCountBadge').innerText = leadRows.length + ' лидов';
+    if (leadRows.length === 0) {
+      leadsTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Лидов пока нет. Строка появляется при клике по кнопке заявки в боте.</td></tr>';
+    } else {
+      leadsTbody.innerHTML = leadRows.map(l => {
+        const who = l.username ? '@' + l.username : (l.first_name || 'ID: ' + l.user_id);
+        const created = l.created_at ? String(l.created_at).replace('T', ' ').slice(0, 16) : '';
+        return `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <td style="padding: 8px 10px; color: var(--text-muted); font-size: 11.5px; white-space: nowrap;">${esc(created)}</td>
+            <td style="padding: 8px 10px; font-weight: 600; color: #f1f5f9;">${esc(who)}</td>
+            <td style="padding: 8px 10px; font-family: monospace; font-size: 11.5px; color: #38bdf8;">${esc(l.slug)}</td>
+            <td style="padding: 8px 10px;">${esc(LEAD_STATUS_LABELS[l.status] || l.status)}</td>
+            <td style="padding: 8px 10px;">${esc(l.product || '')}</td>
+            <td style="padding: 8px 10px; text-align: right; white-space: nowrap;">${l.amount == null ? '' : esc(money(l.amount))}</td>
           </tr>
         `;
       }).join('');

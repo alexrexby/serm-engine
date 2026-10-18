@@ -1,0 +1,25 @@
+{#- Lead card in the owner's chat (Telegram HTML, no autoescape: every user/DB value through |e).
+    Context: lead (leads row: id, user_id, username, first_name, slug, amount), interest (what the lead chose),
+    status (status label), at (stage -> local "DD.MM HH:MM": created, contacted, call_set, call_done, closed;
+    None = not reached), product (product label, "" = none), currency, question ("" = none). -#}
+<b>Лид #{{ lead.id }}</b> · {{ status|e }}
+Клиент: {% if lead.username %}@{{ lead.username|e }}{% else %}{{ lead.first_name|e }}{% endif %} (ID: {{ lead.user_id }})
+Интерес: {{ interest|e }}
+Входная тема: <code>{{ lead.slug|e }}</code>
+
+Заявка: {{ at.created|e }}
+{%- if at.contacted %}
+На связи: {{ at.contacted|e }}{% endif %}
+{%- if at.call_set %}
+Созвон назначен: {{ at.call_set|e }}{% endif %}
+{%- if at.call_done %}
+Созвон прошёл: {{ at.call_done|e }}{% endif %}
+{%- if at.closed %}
+Итог: {{ at.closed|e }}{% endif %}
+{%- if product %}
+Продукт: {{ product|e }}{% endif %}
+{%- if lead.amount is not none %}
+Сумма: {{ "{:,}".format(lead.amount).replace(",", " ") }} {{ currency|e }}{% endif %}
+{%- if question %}
+
+<b>{{ question|e }}</b>{% endif %}

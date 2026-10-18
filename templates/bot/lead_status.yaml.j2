@@ -1,0 +1,58 @@
+{#- Lead status buttons in the owner's chat (core/lead_status.py); YAML after rendering (profile values only,
+    no user input). Context: profile.
+    labels: status names on the card and in toasts. actions: button texts; sale buttons are "sale" + product label.
+    questions: the card's question for the current status (empty = no question).
+    reminders: hours a lead may sit in a status before one reminder (only these statuses are reminded about).
+    products: what a sale was for; id is [a-z0-9_], at most 16 chars (it travels in callback_data);
+    label default: the offer tier title. currency: after the amount.
+    stale: toast for an outdated button, {status} = current status label. no_open: /leads with nothing open. -#}
+labels:
+  new: "🆕 Новая заявка"
+  no_contact: "🔇 Не вышел на связь"
+  contacted: "📞 На связи"
+  call_set: "🗓 Созвон назначен"
+  no_show: "🚫 Не пришёл на созвон"
+  call_done: "✅ Созвон состоялся"
+  thinking: "🤔 Думает"
+  sale: "💰 Продажа"
+  no_sale: "❌ Отказ"
+actions:
+  contacted: "📞 Вышел на связь"
+  no_contact: "🔇 Не отвечает"
+  call_set: "🗓 Созвон назначен"
+  call_done: "✅ Созвон прошёл"
+  no_show: "🚫 Не пришёл"
+  thinking: "🤔 Думает"
+  no_sale: "❌ Отказ"
+  sale: "💰 Продажа:"
+  amount: "💰 Указать сумму"
+  noamount: "Без суммы"
+questions:
+  new: "Человек вышел на связь?"
+  no_contact: "Если всё-таки написал — отметьте."
+  contacted: "Договорились о созвоне?"
+  call_set: "Чем закончился созвон?"
+  no_show: "Созвон перенесли или это отказ?"
+  call_done: "Какой результат?"
+  thinking: "Решил?"
+  sale: ""
+  no_sale: ""
+amount_question: "Сумма сделки? Ответьте числом в этом чате или нажмите «Без суммы»."
+amount_saved: "Сумма записана"
+amount_bad: "Не понял сумму. Напишите числом, например 150000 или 150к."
+amount_failed: "Сумму записать не удалось: у этого лида она уже есть или он не в «Продаже»."
+amount_expired: "Время ввода суммы истекло — нажмите «Указать сумму» на карточке."
+more_open: "Ещё открытых: {n} — список в админке, вкладка «Аналитика»."
+no_open: "Открытых лидов нет."
+stale: "Уже: {status}"
+reminders:
+  new: 24
+  call_set: 48
+  thinking: 168
+currency: "₽"
+products:
+{%- for tier in profile.offer_tiers if tier.id != "diy" %}
+  - id: {{ tier.id }}
+{%- endfor %}
+  - id: other
+    label: "Другое"

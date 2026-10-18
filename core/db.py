@@ -4,6 +4,7 @@ Database layer for SERM Distribution Engine (SQLite).
 import sqlite3
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
@@ -59,13 +60,55 @@ CREATE TABLE IF NOT EXISTS bot_events (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Lead status: one row per person, written only by the owner (lead status buttons in Telegram).
+-- *_at of a stage = when it was FIRST reached (COALESCE), so the funnel to money stays monotonic.
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    username TEXT,
+    first_name TEXT,
+    slug TEXT NOT NULL,
+    interest TEXT,
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    contacted_at TIMESTAMP,
+    call_set_at TIMESTAMP,
+    call_done_at TIMESTAMP,
+    closed_at TIMESTAMP,
+    product TEXT,
+    amount INTEGER,
+    reminded_status TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_articles_campaign ON articles(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_articles_platform ON articles(platform);
 CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status);
 CREATE INDEX IF NOT EXISTS idx_bot_events_user ON bot_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_bot_events_type ON bot_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_bot_events_slug ON bot_events(slug);
+CREATE INDEX IF NOT EXISTS idx_leads_slug ON leads(slug);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
 """
+
+# PRAGMA user_version 0 -> 1: leads of the clicks made before the leads table existed (first tier_click of each
+# person). reminded_status = 'new': history is reachable through /leads, the owner is not flooded with reminders.
+BACKFILL_LEADS_SQL = """
+INSERT OR IGNORE INTO leads (user_id, username, first_name, slug, interest, status, created_at, status_at,
+                             reminded_status)
+SELECT e.user_id, e.username, e.first_name, COALESCE(NULLIF(TRIM(e.slug), ''), 'general'), e.details, 'new',
+       e.created_at, e.created_at, 'new'
+FROM bot_events e
+WHERE e.event_type = 'tier_click'
+  AND e.rowid = (SELECT f.rowid FROM bot_events f
+                 WHERE f.user_id = e.user_id AND f.event_type = 'tier_click'
+                 ORDER BY f.created_at, f.rowid LIMIT 1)
+"""
+SCHEMA_VERSION = 1
+
+# Stage columns set_lead_status may stamp (never interpolated from outside this list)
+LEAD_STAGE_COLUMNS = ("contacted_at", "call_set_at", "call_done_at", "closed_at")
+LEAD_CLOSED_STATUSES = ("sale", "no_sale")
 
 ANALYTICS_TEXTS = "analytics/recommendations.yaml"
 SAMPLE_STATUS_TEXTS = "analytics/sample_status.yaml"
@@ -119,6 +162,11 @@ class Database:
     def _init_db(self):
         with self._conn() as conn:
             conn.executescript(SCHEMA_SQL)
+        # One transaction: the backfill and the version bump land together or not at all
+        with self._conn() as conn:
+            if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+                conn.execute(BACKFILL_LEADS_SQL)
+                conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     # --- Campaigns ---
     def add_campaign(self, campaign: Campaign):
@@ -279,6 +327,17 @@ class Database:
             cr_pdf = round((unique_pdfs / unique_starts * 100), 1) if unique_starts > 0 else 0.0
             cr_lead = round((unique_leads / unique_starts * 100), 1) if unique_starts > 0 else 0.0
 
+            # After the lead click: what the owner marked in Telegram (leads table)
+            lead_row = conn.execute("""
+                SELECT COUNT(contacted_at), COUNT(call_set_at), COUNT(call_done_at),
+                       COUNT(CASE WHEN status = 'sale' THEN 1 END),
+                       COALESCE(SUM(CASE WHEN status = 'sale' THEN amount END), 0)
+                FROM leads
+            """).fetchone()
+            unique_contacted, unique_calls_set, unique_calls_done, unique_sales, revenue = lead_row
+            cr_sale = round((unique_sales / unique_starts * 100), 1) if unique_starts > 0 else 0.0
+            cr_lead_to_sale = round((unique_sales / unique_leads * 100), 1) if unique_leads > 0 else 0.0
+
             # Статистическая выборка: ориентир 50–100 уникальных переходов
             sample_min = 50
             sample_target = 100
@@ -314,7 +373,14 @@ class Database:
                 "sample_stage": sample_stage,
                 "sample_status": sample_status,
                 "sample_description": sample_description,
-                "sample_color": sample_color
+                "sample_color": sample_color,
+                "unique_contacted": unique_contacted,
+                "unique_calls_set": unique_calls_set,
+                "unique_calls_done": unique_calls_done,
+                "unique_sales": unique_sales,
+                "revenue": revenue,
+                "cr_sale": cr_sale,
+                "cr_lead_to_sale": cr_lead_to_sale
             }
 
     def get_slug_breakdown(self) -> List[Dict[str, Any]]:
@@ -332,6 +398,17 @@ class Database:
                 GROUP BY COALESCE(NULLIF(slug, ''), 'general')
                 ORDER BY starts DESC, subs DESC
             """).fetchall()
+            # Separate query over leads, merged by slug: the bot_events counts above stay exactly as they were
+            lead_stats = {r["slug"]: r for r in conn.execute("""
+                SELECT slug,
+                       COUNT(contacted_at) as contacted,
+                       COUNT(call_set_at) as calls_set,
+                       COUNT(call_done_at) as calls_done,
+                       COUNT(CASE WHEN status = 'sale' THEN 1 END) as sales,
+                       COALESCE(SUM(CASE WHEN status = 'sale' THEN amount END), 0) as revenue
+                FROM leads
+                GROUP BY slug
+            """).fetchall()}
 
             result = []
             for r in rows:
@@ -368,7 +445,9 @@ class Database:
                     "pdfs": pdfs,
                     "leads": leads,
                     "cr_lead": cr_lead,
-                    "efficiency": efficiency
+                    "efficiency": efficiency,
+                    **{key: (lead_stats[s][key] if s in lead_stats else 0)
+                       for key in ("contacted", "calls_set", "calls_done", "sales", "revenue")}
                 })
             return result
 
@@ -381,6 +460,87 @@ class Database:
                 (user_id,)
             ).fetchone()
         return row[0] if row else None
+
+    # --- Leads (status set by the owner in Telegram) ---
+    def upsert_lead(self, user_id: int, username: Optional[str], first_name: Optional[str],
+                    slug: Optional[str], interest: Optional[str]) -> int:
+        """Lead id of this person; created on the first lead click. Slug and created_at keep the FIRST attribution."""
+        clean_slug = (slug or "general").strip() or "general"
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO leads (user_id, username, first_name, slug, interest)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (user_id, username, first_name, clean_slug, interest)
+            )
+            return conn.execute("SELECT id FROM leads WHERE user_id = ?", (user_id,)).fetchone()[0]
+
+    def get_lead(self, lead_id: int) -> Optional[Dict[str, Any]]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+            return dict(row) if row else None
+
+    def set_lead_status(self, lead_id: int, expected_status: str, new_status: str,
+                        stage_column: Optional[str] = None, product: Optional[str] = None) -> bool:
+        """Atomic transition: applies only while the lead is still in expected_status (a double tap or a stale
+        button changes nothing). A stage column is stamped once; product only when given."""
+        if stage_column is not None and stage_column not in LEAD_STAGE_COLUMNS:
+            raise ValueError(f"unknown lead stage column: {stage_column}")
+        stage_sql = f", {stage_column} = COALESCE({stage_column}, CURRENT_TIMESTAMP)" if stage_column else ""
+        with self._conn() as conn:
+            cur = conn.execute(
+                f"""
+                UPDATE leads
+                SET status = ?, status_at = CURRENT_TIMESTAMP, reminded_status = NULL,
+                    product = COALESCE(?, product){stage_sql}
+                WHERE id = ? AND status = ?
+                """,
+                (new_status, product, lead_id, expected_status)
+            )
+            return cur.rowcount == 1
+
+    def set_lead_amount(self, lead_id: int, amount: int) -> bool:
+        with self._conn() as conn:
+            cur = conn.execute("UPDATE leads SET amount = ? WHERE id = ? AND status = 'sale'", (amount, lead_id))
+            return cur.rowcount == 1
+
+    def list_leads(self, limit: int = 50, open_only: bool = False) -> List[Dict[str, Any]]:
+        where = f"WHERE status NOT IN ({', '.join('?' for _ in LEAD_CLOSED_STATUSES)})" if open_only else ""
+        params = (*LEAD_CLOSED_STATUSES, limit) if open_only else (limit,)
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM leads {where}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                params
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def due_lead_reminders(self, hours_by_status: Dict[str, int], now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        """Leads sitting in a reminded status longer than its threshold and not yet reminded about it."""
+        now = now or datetime.now(timezone.utc)
+        due = []
+        with self._conn() as conn:
+            for status, hours in hours_by_status.items():
+                # status_at is CURRENT_TIMESTAMP text (UTC, "YYYY-MM-DD HH:MM:SS"): compare as the same text
+                cutoff = (now.astimezone(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+                rows = conn.execute(
+                    """
+                    SELECT * FROM leads
+                    WHERE status = ? AND status_at <= ? AND reminded_status IS NOT status
+                    ORDER BY status_at, id
+                    """,
+                    (status, cutoff)
+                ).fetchall()
+                due.extend(dict(r) for r in rows)
+        return due
+
+    def mark_reminded(self, lead_id: int, status: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE leads SET reminded_status = ? WHERE id = ? AND status = ?", (status, lead_id, status))
 
     def get_recent_events(self, limit: int = 50) -> List[Dict[str, Any]]:
         with self._conn() as conn:
