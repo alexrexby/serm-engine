@@ -216,7 +216,8 @@ async def send_lead_magnet(bot: Bot, chat_id: int, magnet_info: Dict[str, Any], 
             username=user_meta.get("username"),
             first_name=user_meta.get("first_name"),
             event_type="pdf_delivered",
-            slug=magnet_info.get("slug", "general"),
+            # the visit source (the /start slug), as the start event: per-platform rows stay whole
+            slug=magnet_info.get("raw_slug") or magnet_info.get("slug", "general"),
             details=magnet_info.get("filename", "")
         )
 
@@ -258,6 +259,15 @@ def _tier_text(profile: Any, tier_id: str, **ctx: Any) -> str:
         if e.name != name:
             raise
     return render("bot/tier.html.j2", profile, tier_id=tier_id, **ctx)
+
+
+def _restored_slug(db: Database, user_id: int) -> str:
+    """Lead magnet slug for a gate pressed after a restart: the latest /start; organic -> "" (no PDF, as
+    without a restart), unknown -> the default magnet."""
+    slug = db.last_start_slug(user_id)
+    if slug == ORGANIC_SLUG:
+        return ""
+    return slug or "general"
 
 
 def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], contact_username: str,
@@ -331,7 +341,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
                 username=user.username,
                 first_name=user.first_name,
                 event_type="subscribed",
-                slug=magnet["slug"],
+                slug=slug,
                 details="Already subscribed on start"
             )
             await send_lead_magnet(bot, message.chat.id, magnet, db, user_meta, profile, channel_username)
@@ -341,7 +351,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
                 username=user.username,
                 first_name=user.first_name,
                 event_type="check_sub_attempt",
-                slug=magnet["slug"],
+                slug=slug,
                 details="Unsubscribed, gate displayed"
             )
 
@@ -361,10 +371,10 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
         if callback.data == "check_sub_organic":
             slug = ""  # organic gate: never a lead magnet, even after a restart
         else:
-            # No pending entry (e.g. the bot restarted after the gate): the default lead magnet, as before
-            slug = user_pending_magnet.get(user_id, "general")
+            # No pending entry (the bot restarted after the gate): the latest /start from the DB, else default
+            slug = user_pending_magnet[user_id] if user_id in user_pending_magnet else _restored_slug(db, user_id)
         magnet = resolve_magnet_info(slug, exports_dir, profile) if slug else None
-        event_slug = magnet["slug"] if magnet else ORGANIC_SLUG
+        event_slug = magnet["raw_slug"] if magnet else ORGANIC_SLUG
 
         if subscribed:
             db.log_bot_event(
@@ -407,7 +417,10 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             await callback.answer()
             return
         user = callback.from_user
-        slug = user_pending_magnet.get(user.id, "general") or ORGANIC_SLUG
+        if user.id in user_pending_magnet:
+            slug = user_pending_magnet[user.id] or ORGANIC_SLUG
+        else:  # the bot restarted since this user's /start
+            slug = db.last_start_slug(user.id) or "general"
         if entry["magnet"] and not await is_user_subscribed(bot, channel_username, user.id):
             # An old menu after unsubscribing: the material stays behind the subscription
             await callback.answer(buttons["not_subscribed"], show_alert=True)
@@ -426,7 +439,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
         if entry["magnet"]:
             # The default lead magnet (what the button names), logged under the visit's source slug;
             # user_pending_magnet stays untouched, no second menu
-            magnet = dict(resolve_magnet_info("general", exports_dir, profile), slug=slug)
+            magnet = dict(resolve_magnet_info("general", exports_dir, profile), slug=slug, raw_slug=slug)
             user_meta = {"username": user.username, "first_name": user.first_name}
             await send_lead_magnet(bot, callback.message.chat.id, magnet, db, user_meta, profile,
                                    channel_username, with_funnel=False)

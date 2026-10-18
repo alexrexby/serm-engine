@@ -372,6 +372,16 @@ class Database:
                 })
             return result
 
+    def last_start_slug(self, user_id: int) -> Optional[str]:
+        """Slug of the user's latest /start: restores the visit source after a bot restart."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT slug FROM bot_events WHERE user_id = ? AND event_type = 'start' "
+                "ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                (user_id,)
+            ).fetchone()
+        return row[0] if row else None
+
     def get_recent_events(self, limit: int = 50) -> List[Dict[str, Any]]:
         with self._conn() as conn:
             rows = conn.execute(

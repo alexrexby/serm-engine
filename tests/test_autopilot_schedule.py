@@ -437,3 +437,35 @@ def test_failed_tg_post_is_one_attempt_and_marks_slot(monkeypatch, tmp_path, clo
 
     assert _with_keys(fired, saves) == [("Mon 11:00", "tg", "2026-10-12_mon_insight"),
                                         ("Tue 13:00", "tg", "2026-10-13_tue_teaser")]
+
+
+def test_dead_platform_is_retried_once_a_round(monkeypatch, tmp_path, clock, saves):
+    # vc's session is dead: the slot after a vc failure goes to spark, vc is retried the next slot
+    calls = []
+
+    class VcDown:
+        def publish(self, article):
+            calls.append((clock.utc + timedelta(hours=3)).strftime("%a") + " " + article.id)
+            ok = article.platform != "vc"
+            return PublishResult(success=ok, platform=article.platform, article_id=article.id,
+                                 status="published" if ok else None, error=None if ok else "session expired")
+
+    schedule = {"articles": WEEKDAY_SCHEDULE["articles"], "telegram": []}
+    engine = autopilot.AutopilotEngine("camp1", profile=_profile(tmp_path, schedule))
+    engine.db = StatusDb([Article(id=i, campaign_id="camp1", platform=p, title=i, lead="", content_markdown="b",
+                                  content_html="<p>b</p>", tags="", status="ready")
+                          for i, p in (("v1", "vc"), ("s1", "spark"), ("s2", "spark"))])
+    engine.is_enabled = lambda: True
+    monkeypatch.setattr(autopilot, "get_publisher", lambda platform: VcDown())
+    alerts = []
+
+    async def record_alert(**kwargs):
+        alerts.append(kwargs)
+
+    monkeypatch.setattr(autopilot, "send_telegram_alert", record_alert)
+
+    clock.run(engine, MONDAY, WEEK_MINUTES, interval=120)
+
+    assert calls == ["Mon v1", "Tue s1", "Wed v1", "Thu s2", "Fri v1"]
+    assert {a.id: a.status for a in engine.db.articles}["v1"] == "failed"
+    assert len(alerts) == 3

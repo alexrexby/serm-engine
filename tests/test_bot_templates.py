@@ -207,7 +207,7 @@ def test_platform_slug_delivers_same_magnet_pdf(profile, alerts, monkeypatch, tm
     assert (info["slug"], info["title"], info["filename"]) == (magnet.slug, magnet.title, magnet.download_filename)
     calls = _run(profile, [_start(1201, slug)], subscribed={1201}, exports_dir=_pdf(profile, tmp_path))
     assert calls[0][0] == "SendDocument" and magnet.title in calls[0][1].caption
-    assert ("start", slug) in logged and ("pdf_delivered", magnet.slug) in logged
+    assert ("start", slug) in logged and ("pdf_delivered", slug) in logged  # the visit source, not the magnet
 
 
 def test_tier_click_alerts_and_links_from_profile(profile, alerts):

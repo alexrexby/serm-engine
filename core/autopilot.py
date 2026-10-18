@@ -24,7 +24,7 @@ from core.indexer import FastIndexer
 from core.telegram_posts import load_posts
 from config.settings import DATA_DIR, EXPORTS_DIR, get_bot_token, load_settings
 from core.profile import DAYS, SLOT_WINDOW_MINUTES
-from publishers.registry import enabled, get_publisher
+from publishers.registry import PLATFORMS, enabled, get_publisher
 
 logger = logging.getLogger("AutopilotEngine")
 
@@ -79,6 +79,29 @@ class AutopilotState:
     def save(state: Dict[str, Any]):
         STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+# UGC platforms with active sessions first (dzen, vc, spark, executive)
+PLATFORM_PRIORITY = {"dzen": 1, "vc": 2, "spark": 3, "executive": 4, "rb": 5, "tbank": 6, "biz360": 7}
+
+
+def pick_next_article(ready: List[Article], history: List[Dict[str, Any]],
+                      attempts: Optional[Dict[str, str]] = None) -> Article:
+    """Next article: the platform tried longest ago (never = first, ties by priority) — a test period covers
+    every platform and a platform with a dead session is retried once a round instead of every slot;
+    inside a platform a title not yet published there goes first (campaign variants share a title).
+    Editorial-pitch platforms only prepare a pitch file for the owner, nothing reaches readers: they go
+    after every platform that publishes, as before the rotation."""
+    last = {h.get("platform"): h.get("timestamp") or "" for h in history}
+    last.update(attempts or {})
+    published = {(h.get("platform"), h.get("title")) for h in history}
+
+    def key(a: Article):
+        spec = PLATFORMS.get(a.platform)
+        return (bool(spec and spec.type == "editorial_pitch"), last.get(a.platform, ""), (a.platform, a.title) in published,
+                PLATFORM_PRIORITY.get(a.platform, 99))
+
+    return min(ready, key=key)  # min keeps queue order among equals
 
 
 class AutopilotEngine:
@@ -153,10 +176,9 @@ class AutopilotEngine:
             logger.info("Autopilot: No ready articles left in campaign queue.")
             return None
 
-        # Prioritize UGC platforms with active sessions first (dzen, vc, spark, executive)
-        priority = {"dzen": 1, "vc": 2, "spark": 3, "executive": 4, "rb": 5, "tbank": 6, "biz360": 7}
-        ready_articles.sort(key=lambda a: priority.get(a.platform, 99))
-        target_article = ready_articles[0]
+        state = AutopilotState.load()
+        target_article = pick_next_article(ready_articles, state.get("published_history", []),
+                                           state.get("platform_attempts", {}))
 
         logger.info(f"Autopilot: Selecting next article for [{target_article.platform}]: {target_article.title[:50]}...")
 
@@ -171,6 +193,8 @@ class AutopilotEngine:
 
         state = AutopilotState.load()
         msk_now = get_msk_now()
+        # rotation key: any outcome counts as this platform's turn
+        state.setdefault("platform_attempts", {})[target_article.platform] = msk_now.isoformat()
         # the worker compares it with the slot's date; a manual run marks the schedule's local today
         state["last_article_day"] = slot_day or self.local_now().strftime("%Y-%m-%d")
         failures = state.get("article_failures", {})  # article_id -> failed slots in a row; absent = none yet
