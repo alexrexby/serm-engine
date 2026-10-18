@@ -127,6 +127,8 @@ def _buttons(profile: Any, channel_username: str, contact_username: Optional[str
             "reply_button": entry.get("reply_button") or entry["id"],
             "reply_url": entry.get("reply_url") or (tier.url if tier and tier.url else _tg_url(contact)),
             "lead": entry.get("lead", True),
+            # magnet: the button sends the lead magnet PDF in the bot (hidden right after a PDF was sent)
+            "magnet": bool(entry.get("magnet", False)),
             "tier": tier,
         })
     data["funnel"] = funnel
@@ -145,12 +147,14 @@ def get_subscription_keyboard(channel_username: str, profile: Optional[Any] = No
     ])
 
 
-def get_funnel_keyboard(profile: Optional[Any] = None, channel_username: Optional[str] = None) -> InlineKeyboardMarkup:
+def get_funnel_keyboard(profile: Optional[Any] = None, channel_username: Optional[str] = None,
+                        after_magnet: bool = False) -> InlineKeyboardMarkup:
     profile = _profile(profile)
     buttons = _buttons(profile, channel_username or profile.telegram.channel)
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=entry["button"], callback_data=f"tier_{entry['id']}")]
         for entry in buttons["funnel"]
+        if not (after_magnet and entry["magnet"])
     ])
 
 
@@ -181,7 +185,7 @@ async def is_user_subscribed(bot: Bot, channel_id: str, user_id: int) -> bool:
 
 async def send_lead_magnet(bot: Bot, chat_id: int, magnet_info: Dict[str, Any], db: Database,
                            user_meta: Optional[Dict[str, Any]] = None, profile: Optional[Any] = None,
-                           channel_username: Optional[str] = None):
+                           channel_username: Optional[str] = None, with_funnel: bool = True):
     profile = _profile(profile)
     welcome_text = render("bot/magnet_caption.html.j2", profile, magnet=magnet_info)
 
@@ -212,15 +216,17 @@ async def send_lead_magnet(bot: Bot, chat_id: int, magnet_info: Dict[str, Any], 
             details=magnet_info.get("filename", "")
         )
 
-    await _send_funnel(bot, chat_id, profile, channel_username)
+    if with_funnel:
+        await _send_funnel(bot, chat_id, profile, channel_username, after_magnet=True)
 
 
-async def _send_funnel(bot: Bot, chat_id: int, profile: Any, channel_username: Optional[str]) -> None:
+async def _send_funnel(bot: Bot, chat_id: int, profile: Any, channel_username: Optional[str],
+                       after_magnet: bool = False) -> None:
     # Offer tiers
     await bot.send_message(
         chat_id=chat_id,
-        text=render("bot/funnel.html.j2", profile),
-        reply_markup=get_funnel_keyboard(profile, channel_username),
+        text=render("bot/funnel.html.j2", profile, after_magnet=after_magnet),
+        reply_markup=get_funnel_keyboard(profile, channel_username, after_magnet=after_magnet),
         parse_mode="HTML"
     )
 
@@ -398,15 +404,29 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             return
         user = callback.from_user
         slug = user_pending_magnet.get(user.id, "general") or ORGANIC_SLUG
+        if entry["magnet"] and not await is_user_subscribed(bot, channel_username, user.id):
+            # An old menu after unsubscribing: the material stays behind the subscription
+            await callback.answer(buttons["not_subscribed"], show_alert=True)
+            return
         db.log_bot_event(
             user_id=user.id,
             username=user.username,
             first_name=user.first_name,
-            event_type="tier_click",
+            # Analytics counts tier_click as a lead: a free button must not inflate it
+            event_type="tier_click" if entry["lead"] else "free_click",
             slug=slug,
             details=f"tier_{tier_id}"
         )
         await callback.answer()
+
+        if entry["magnet"]:
+            # The default lead magnet (what the button names), logged under the visit's source slug;
+            # user_pending_magnet stays untouched, no second menu
+            magnet = dict(resolve_magnet_info("general", exports_dir, profile), slug=slug)
+            user_meta = {"username": user.username, "first_name": user.first_name}
+            await send_lead_magnet(bot, callback.message.chat.id, magnet, db, user_meta, profile,
+                                   channel_username, with_funnel=False)
+            return
 
         tier = entry["tier"]
         if entry["lead"]:
