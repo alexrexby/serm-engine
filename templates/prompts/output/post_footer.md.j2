@@ -1,0 +1,7 @@
+{#- Appended by the code to every llm-written Telegram post. Context: profile. The model never writes links. -#}
+{%- set magnet = profile.lead_magnet() -%}
+{%- if magnet and profile.telegram.bot_username -%}
+Забрать «{{ magnet.title }}» бесплатно: {{ deeplink(magnet.slug) }}
+{%- else -%}
+Подписывайтесь: {{ profile.telegram.channel }}
+{%- endif -%}

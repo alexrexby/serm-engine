@@ -1,0 +1,2 @@
+{#- Comma-separated article tags. Context: profile, brand, seed_topic. -#}
+{{ brand }}{% for alias in profile.aliases if alias != brand %}, {{ alias }}{% endfor %}, {{ seed_topic }}

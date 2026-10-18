@@ -1,0 +1,5 @@
+{#- Призыв забрать лид-магнит по умолчанию (profile.default_lead_magnet). Без bot_username — контакт. -#}
+{%- if magnet -%}
+📥 {{ magnet.title }}
+{% if profile.telegram.bot_username %}👉 [Забрать в Telegram-боте]({{ deeplink(magnet.slug) }}){% else %}👉 Напишите {{ profile.telegram.contact }}{% endif %}
+{%- endif %}

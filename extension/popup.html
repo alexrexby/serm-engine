@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>SERM Cookie Sync</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo-icon">🔑</div>
+        <div>
+          <h1>SERM Cookie Sync</h1>
+          <div class="subtitle">Синхронизация сессий</div>
+        </div>
+      </div>
+      <div class="server-status" id="serverStatus" title="Статус связи с SERM Engine">
+        <span class="dot dot-yellow"></span>
+        <span class="status-text">Проверка...</span>
+      </div>
+    </header>
+
+    <!-- ACTIVE TAB QUICK SYNC -->
+    <div id="activeTabCard" class="card active-card" style="display: none;">
+      <div class="active-badge">Текущая вкладка</div>
+      <div class="active-info">
+        <span class="platform-icon" id="activeIcon">🌐</span>
+        <div>
+          <div class="active-title" id="activeName">Обнаружена площадка</div>
+          <div class="active-domain" id="activeDomain">domain.ru</div>
+        </div>
+      </div>
+      <button id="btnSyncActive" class="btn btn-primary btn-block">
+        ⚡️ Синхронизировать эту вкладку
+      </button>
+    </div>
+
+    <!-- 1-CLICK SYNC ALL -->
+    <div class="section-actions">
+      <button id="btnSyncAll" class="btn btn-accent btn-block">
+        🚀 Синхронизировать ВСЕ сессии в 1 клик
+      </button>
+    </div>
+
+    <!-- PLATFORMS LIST -->
+    <div class="platforms-list">
+      <div class="platform-row" data-platform="vc" data-domain=".vc.ru">
+        <div class="platform-info">
+          <span class="plat-name">VC.ru</span>
+          <span class="plat-badge" id="badge-vc">Проверка...</span>
+        </div>
+        <button class="btn btn-sm btn-outline btn-sync-single" data-platform="vc">Синхр.</button>
+      </div>
+
+      <div class="platform-row" data-platform="spark" data-domain=".spark.ru">
+        <div class="platform-info">
+          <span class="plat-name">Spark.ru</span>
+          <span class="plat-badge" id="badge-spark">Проверка...</span>
+        </div>
+        <button class="btn btn-sm btn-outline btn-sync-single" data-platform="spark">Синхр.</button>
+      </div>
+
+      <div class="platform-row" data-platform="dzen" data-domain=".dzen.ru">
+        <div class="platform-info">
+          <span class="plat-name">Дзен (Dzen.ru)</span>
+          <span class="plat-badge" id="badge-dzen">Проверка...</span>
+        </div>
+        <button class="btn btn-sm btn-outline btn-sync-single" data-platform="dzen">Синхр.</button>
+      </div>
+
+      <div class="platform-row" data-platform="executive" data-domain=".e-xecutive.ru">
+        <div class="platform-info">
+          <span class="plat-name">E-xecutive.ru</span>
+          <span class="plat-badge" id="badge-executive">Проверка...</span>
+        </div>
+        <button class="btn btn-sm btn-outline btn-sync-single" data-platform="executive">Синхр.</button>
+      </div>
+    </div>
+
+    <!-- LOG / TOAST CONSOLE -->
+    <div id="logConsole" class="log-console" style="display: none;"></div>
+
+    <!-- SETTINGS ACCORDION -->
+    <div class="settings-box">
+      <div class="settings-header" id="settingsToggle">
+        <span>⚙️ Настройки сервера</span>
+        <span class="toggle-arrow">▼</span>
+      </div>
+      <div class="settings-body" id="settingsBody" style="display: none;">
+        <label>Сервер SERM Engine (URL):</label>
+        <input type="text" id="cfgServerUrl" placeholder="https://serm.example.com">
+
+        <label>Admin Token:</label>
+        <input type="password" id="cfgAdminToken" placeholder="ADMIN_TOKEN из файла окружения сервера">
+
+        <div class="checkbox-row">
+          <input type="checkbox" id="cfgAutoSync">
+          <label for="cfgAutoSync">Авто-синхронизация при входе на площадки</label>
+        </div>
+
+        <button id="btnSaveSettings" class="btn btn-sm btn-outline btn-block" style="margin-top: 8px;">
+          Сохранить настройки
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+# Пример профиля компании (kind: company → тексты от лица команды, «мы»).
+# Скопируйте в profiles/<имя>.yaml и замените значения. Компания, каналы и домены вымышлены.
+# Схема: core/profile.py (неизвестный ключ — ошибка при старте).
+schema_version: 1
+kind: company
+name: "ООО «Ромашка»"
+display_name: "Ромашка"
+aliases: ["Ромашка", "ООО Ромашка", "romashka"]
+
+voice:
+  pronoun: auto
+  tone: "дружелюбная команда сервиса, пишет просто и по делу"
+  theses:
+    - "Клиент узнаёт статус заказа раньше, чем спросит"
+    - "Честные сроки лучше быстрых обещаний"
+    - "Каждую жалобу разбираем и отвечаем публично"
+  forbidden_words: ["лучшие на рынке", "гарантированно"]
+  forbidden_topics: ["политика", "конкуренты поимённо"]
+  system_prompt_extra: ""
+
+seo:
+  target_query: "Ромашка отзывы"
+  seed_topic: "Доставка и сервис для небольших магазинов: сроки, возвраты, поддержка"
+
+campaign_id: "demo0002"
+
+telegram:
+  channel: "@example_company_news"
+  channel_title: "Ромашка: новости сервиса"
+  contact: "@example_support"
+  bot_username: null
+
+offer_tiers:
+  - id: diy
+    title: "Начните сами"
+    text: "Бесплатная памятка и разборы кейсов в нашем канале."
+    cta: "Получить памятку"
+    url: null
+  - id: workshop
+    title: "Обучение команды"
+    text: "Проведём онлайн-занятие для ваших сотрудников по работе с возвратами и отзывами."
+    cta: "Оставить заявку"
+    url: "https://example.com/training"
+  - id: turnkey
+    title: "Подключение под ключ"
+    text: "Настроим сервис за вас и сопроводим первый месяц."
+    cta: "Написать нам"
+    url: "https://example.com/contact"
+
+lead_magnets:
+  - slug: audit
+    match: ["audit", "check", "service"]
+    title: "Памятка: 10 вопросов, которые клиенты задают до покупки"
+    download_filename: "Service_Checklist.pdf"
+    file_prefix: "lead_magnet_audit.pdf"
+    desc: "Что ответить заранее на сайте и в карточке товара, чтобы снизить число возвратов и негативных отзывов."
+    topic_name: "Сервис и возвраты"
+    template: lead_magnet/checklist
+default_lead_magnet: audit
+
+platforms:
+  vc: {enabled: true}
+  spark: {enabled: true}
+  dzen: {enabled: false, editor_url: "https://dzen.ru/profile/editor/example"}
+  executive: {enabled: false}
+  tbank: {enabled: false}
+  biz360: {enabled: false}
+  rb: {enabled: false}
+
+radar:
+  feeds:
+    - {name: "VC.ru", url: "https://vc.ru/rss"}
+    - {name: "RB.RU", url: "https://rb.ru/feeds/all/"}
+  relevant_keywords: ["доставк", "возврат", "маркетплейс", "отзыв", "сервис"]
+  noise_keywords: ["гороскоп", "сериал", "крипт"]
+
+templates_dir: null
+
+generation:
+  mode: llm                 # llm — содержание пишет модель (нужен LLM_API_KEY); template — встроенные шаблоны
+  model: null               # null → LLM_MODEL из .env
+  temperature: 0.7
+  max_tokens: 4096
+  review_required: true     # статьи создаются черновиками (draft) и публикуются после одобрения в админке
+  language: ru
+
+deploy:
+  server_url: null

@@ -1,0 +1,7 @@
+{#- Offer after the lead magnet: one item per profile.offer_tiers entry. Telegram HTML.
+    Context: profile. -#}
+🚀 <b>Если захотите пойти дальше — {{ profile.display_name|e }}:</b>
+{% for tier in profile.offer_tiers %}
+{{ loop.index }}. <b>{{ tier.title|e }}</b>{% if tier.text %}
+{{ tier.text|e }}{% endif %}
+{% endfor %}

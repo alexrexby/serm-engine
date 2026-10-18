@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход в панель управления | {{ profile.display_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #0a0f1d;
+    --card-bg: #121a2d;
+    --card-border: #1e293b;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  .lock-icon {
+    font-size: 38px;
+    margin-bottom: 16px;
+    display: inline-block;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input[type="password"] {
+    width: 100%;
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  input[type="password"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .btn {
+    width: 100%;
+    background: var(--accent);
+    color: #0b1120;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .error-msg {
+    color: #ef4444;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-top: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="lock-icon">🔒</div>
+  <h1>Панель управления</h1>
+  <p>Введите токен администратора — это значение ADMIN_TOKEN из файла .env на сервере.</p>
+
+  <form id="loginForm">
+    <div class="form-group">
+      <label>Токен администратора</label>
+      <input type="password" id="adminToken" placeholder="Токен" required autofocus autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn">Войти</button>
+    <div class="error-msg" id="errorMsg">❌ Токен не подошёл. Проверьте ADMIN_TOKEN в .env</div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = document.getElementById('adminToken').value.trim();
+    const err = document.getElementById('errorMsg');
+    err.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = '/admin';
+      } else {
+        err.style.display = 'block';
+      }
+    } catch (e) {
+      err.innerText = 'Сервер не отвечает. Проверьте, что он запущен, и попробуйте ещё раз';
+      err.style.display = 'block';
+    }
+  });
+</script>
+
+</body>
+</html>

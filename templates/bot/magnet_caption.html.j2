@@ -1,0 +1,9 @@
+{#- Caption of the lead magnet (or text, if the PDF is missing). Telegram HTML, no autoescape: user input (first_name) goes through |e.
+    Context: profile, magnet (slug, title, desc, filename). -#}
+✅ <b>Подписка подтверждена!</b>
+
+Спасибо! Вот обещанный материал:
+
+📄 <b>{{ magnet.title|e }}</b>
+
+{{ magnet.desc|e }}

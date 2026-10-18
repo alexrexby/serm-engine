@@ -1,0 +1,7 @@
+{#- Answer to a funnel button tier_<id> when the profile has no bot/tier_<id>.html.j2. Telegram HTML.
+    Context: profile, tier_id, tier (offer tier or none), channel, channel_url, contact, contact_url. -#}
+<b>{{ (tier.title if tier else tier_id)|e }}</b>{% if tier and tier.text %}
+
+{{ tier.text|e }}{% endif %}
+
+👉 Подробности — по кнопке ниже.

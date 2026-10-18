@@ -1,0 +1,10 @@
+{#- Lead magnet (checklist) task. Context: profile, brand, seo, news, magnet (profile.lead_magnets[slug]). -#}
+{% include "prompts/partials/context.md.j2" %}
+Задача: составь практический чек-лист в подарок подписчикам.
+Название: {{ magnet.title }}
+{% if magnet.desc %}О чём он: {{ magnet.desc }}
+{% endif %}
+Структура: от 4 до 6 разделов, в каждом от 3 до 6 конкретных пунктов-проверок, которые читатель выполнит сам, без специалиста. Пункт — одно действие или вопрос к себе, без воды.
+
+Ответ — JSON:
+{"title": "название чек-листа", "sections": [{"heading": "название раздела", "items": ["пункт проверки"]}]}

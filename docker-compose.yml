@@ -1,0 +1,28 @@
+services:
+  serm-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: serm-daemon
+    restart: unless-stopped
+    ports:
+      # Admin panel is published on localhost only by default; set ADMIN_BIND=0.0.0.0
+      # in .env to expose it (e.g. for the browser extension to sync cookies)
+      - "${ADMIN_BIND:-127.0.0.1}:${ADMIN_PORT:-8180}:8180"
+    env_file:
+      - .env
+    environment:
+      # Inside the container listen on all interfaces at the fixed port;
+      # what is reachable from outside is decided by the `ports` mapping above
+      ADMIN_HOST: "0.0.0.0"
+      ADMIN_PORT: "8180"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+      # Brand profile lives outside the image; without it the process stops with ProfileError
+      - ./profiles:/app/profiles:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

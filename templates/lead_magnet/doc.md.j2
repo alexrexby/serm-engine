@@ -1,0 +1,23 @@
+{#- Lead magnet document (markdown). Context: profile, preset (title, subtitle, badge, manifest, blocks),
+    brand_name, channel, channel_url. Offer block — shared partial. -#}
+# {{ preset.title }}
+
+> **{{ preset.subtitle }}**  
+> *Автор:* {{ brand_name }} | *Канал:* [{{ channel }}]({{ channel_url }})
+
+---
+
+{{ preset.manifest }}
+
+---
+
+## Чек-лист
+
+{% for b in preset.blocks %}### [ ] {{ b.title }}
+- **Риск:** {{ b.risk }}
+- **Суть:** {{ b.desc }}
+- **Что сделать:** {{ b.solution }}
+
+{% endfor %}---
+
+{% include "partials/offer.md.j2" %}

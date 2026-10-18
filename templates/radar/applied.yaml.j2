@@ -1,0 +1,11 @@
+{#- Данные радара. Встроенный вариант пуст: готовые разборы и правила — в шаблонах профиля.
+    Рендерится один раз над профилем, затем yaml.safe_load. Текст новостей сюда НЕ подставляется.
+    evergreen_cases — готовые разборы бренда, показываются до свежих новостей:
+      {id, title, source_name, published_at, category, business_score, applied_title,
+       business_hole, vibecode_solution, financial_impact, cursor_prompt, lead_magnet_preset, description}
+    rules — первое правило, чья подстрока из match есть в title+description новости, дописывает fields;
+    default — поля, если ни одно правило не сработало. Нет applied_title → берётся заголовок новости. -#}
+evergreen_cases: []
+rules: []
+default:
+  business_score: 5.0

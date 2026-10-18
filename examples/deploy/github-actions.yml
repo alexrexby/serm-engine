@@ -1,0 +1,63 @@
+# Example deploy workflow. Copy to .github/workflows/deploy.yml in your own repository
+# and add the repository secrets:
+#   DEPLOY_HOST         user@server
+#   DEPLOY_DIR          directory on the server with docker-compose.yml, .env and profiles/
+#   DEPLOY_SSH_KEY      private key allowed to log in as that user
+#   DEPLOY_KNOWN_HOSTS  output of `ssh-keyscan <server>` (host key is verified, not trusted blindly)
+#
+# Code is delivered by examples/deploy/rsync-deploy.sh: data/, .env and profiles/ on the server
+# are never touched; the new code is checked by `cli.py doctor --offline` in <dir>.staging first,
+# the working directory and the running container are replaced only after it passes.
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Tests
+        run: python -m pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
+        run: |
+          bash examples/deploy/rsync-deploy.sh \
+            --host "$DEPLOY_HOST" \
+            --key ~/.ssh/deploy_key \
+            --dir "$DEPLOY_DIR" \
+            --yes

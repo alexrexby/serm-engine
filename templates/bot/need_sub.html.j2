@@ -1,0 +1,10 @@
+{#- Gate for a user who is not subscribed yet. Telegram HTML, no autoescape: user input (first_name) goes through |e.
+    Context: profile, magnet, channel, first_name. -#}
+👋 <b>Здравствуйте, {{ (first_name or "друг")|e }}!</b>
+
+Материал
+📄 <b>{{ magnet.title|e }}</b>
+
+доступен подписчикам канала 📢 <b>{{ channel|e }}</b>{% if profile.telegram.channel_title %} — «{{ profile.telegram.channel_title|e }}»{% endif %}.
+
+Подпишитесь и нажмите кнопку ниже — материал придёт в этот чат 👇

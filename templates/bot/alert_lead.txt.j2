@@ -1,0 +1,5 @@
+{#- Plain text for send_telegram_alert (it escapes HTML itself — no |e here, it would double-escape).
+    Context: username, first_name, user_id, interest (tier title), slug. -#}
+Клиент: {% if username %}@{{ username }}{% else %}{{ first_name }} (ID: {{ user_id }}){% endif %}
+Интерес: {{ interest }}
+Входная тема: {{ slug }}

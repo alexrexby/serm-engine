@@ -1,0 +1,19 @@
+{#- Встроенный пакет постов (нейтральные тексты; свой пакет — в profiles/<имя>/templates/telegram/).
+    Порядок = очередь автопилота (state next_tg_post_idx). Рендерится над профилем, затем yaml.safe_load.
+    Поля: id (пишется в историю автопилота — не переименовывать на живой установке), title, template. -#}
+posts:
+  - id: post_1_insight
+    title: "Пост 1: Принципы"
+    template: telegram/posts/01-post_1_insight.md.j2
+  - id: post_2_fail_lesson
+    title: "Пост 2: Типичная ошибка"
+    template: telegram/posts/02-post_2_fail_lesson.md.j2
+  - id: post_3_offer
+    title: "Пост 3: Форматы работы"
+    template: telegram/posts/03-post_3_offer.md.j2
+  - id: post_4_article_announcement
+    title: "Пост 4: Анонс статьи (вставьте ссылку)"
+    template: telegram/posts/04-post_4_article_announcement.md.j2
+  - id: post_5_practice
+    title: "Пост 5: Шаг на сегодня"
+    template: telegram/posts/05-post_5_practice.md.j2

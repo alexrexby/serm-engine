@@ -1,0 +1,22 @@
+{#- Offer block appended after article bodies (template and llm modes), shared with bot/lead magnets.
+    Required context: profile. Optional: brand (signature, default profile.display_name), v (voice forms).
+    Iterates profile.offer_tiers; links come only from the profile, never from generated text. -#}
+{%- set voice = v if v is defined else profile.v -%}
+{%- set signature = brand if brand is defined else profile.display_name -%}
+{%- set tg = profile.telegram -%}
+{%- set magnet = profile.lead_magnet() -%}
+## Что дальше
+
+{% for tier in profile.offer_tiers -%}
+{{ loop.index }}. **{{ tier.title }}.** {{ tier.text }}{% if tier.url %} [{{ tier.cta or tier.url }}]({{ tier.url }}){% endif %}
+
+{% endfor -%}
+{% if magnet and tg.bot_username -%}
+Бесплатно: «{{ magnet.title }}» — [забрать в Telegram-боте]({{ deeplink(magnet.slug) }}).
+
+{% endif -%}
+{% if tg.channel.startswith("@") -%}
+Канал: [{{ tg.channel }}](https://t.me/{{ tg.channel[1:] }}). {% endif -%}
+Вопросы — напишите {{ voice.to_me }}: [{{ tg.contact }}](https://t.me/{{ tg.contact[1:] }}).
+
+— *{{ signature }}*

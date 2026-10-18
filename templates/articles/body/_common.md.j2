@@ -1,0 +1,22 @@
+{#- Neutral body of one article section: one paragraph (the generator wraps it in <p>, no markdown lists).
+    Context: step (1-based), section, platform, profile, v, brand, target_query, seed_topic.
+    Sections in articles/platforms.yaml.j2 follow one order: 1 — the situation, 2 — what works,
+    3 — common mistakes, 4 — where to start; `tails`/`plain` below follow the same order (steps 2..4). -#}
+{%- set theses = profile.voice.theses -%}
+{%- set tails = [
+    "Проверьте, выполняется ли оно у вас сейчас: это самый быстрый способ понять, что уже работает, а что нет.",
+    "Там, где его нарушают, обычно и начинаются проблемы — с клиентами, сроками и деньгами.",
+    "Начните с него: для этого не нужен бюджет, нужна договорённость и человек, который за это отвечает.",
+] -%}
+{%- set plain = [
+    "Работает то, что можно проверить: у задачи есть ответственный, срок и одна цифра, по которой видно результат.",
+    "Чаще всего ошибаются не в сложном, а в базовом: договорённости не записаны, а проблему замечают, когда она уже стоила денег.",
+    "Начните с одного вопроса: как это устроено у вас сейчас и кто за это отвечает. Ответ обычно сразу показывает, что поправить первым.",
+] -%}
+{%- if step == 1 -%}
+Вопросы здесь у всех похожие, а решения — разные. Ниже: что работает, где чаще всего ошибаются и с чего начать.
+{%- elif theses -%}
+{{ v.my_n|capitalize }} рабочее правило: «{{ theses[(step - 2) % (theses|length)] }}». {{ tails[(step - 2) % 3] }}
+{%- else -%}
+{{ plain[(step - 2) % 3] }}
+{%- endif -%}

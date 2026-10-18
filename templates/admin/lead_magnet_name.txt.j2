@@ -1,0 +1,8 @@
+{#- Lead magnet name in the admin list. `magnet`: profile lead magnet whose file_prefix is this file, or none -#}
+{% autoescape false -%}
+{% if magnet -%}
+{{ magnet.title }}
+{%- else -%}
+{{ clean_name }}
+{%- endif %}
+{%- endautoescape %}

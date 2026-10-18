@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "serm-engine"
+version = "0.1.0"
+description = "SERM distribution, fast indexing and Telegram lead funnel, configured by a brand profile"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.4",
+    "aiohttp>=3.9",
+    "playwright>=1.40",
+    "pydantic>=2",
+    "pydantic-settings~=2.16",
+    "jinja2>=3.1",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.urls]
+Source = "https://github.com/alexrexby/serm-engine"
+
+[project.scripts]
+serm = "cli:main"
+
+[tool.setuptools]
+packages = ["config", "core", "publishers"]
+py-modules = ["cli", "scheduler"]

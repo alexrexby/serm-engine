@@ -1,0 +1,88 @@
+# Пример профиля личного бренда (kind: person → тексты от первого лица, «я»).
+# Скопируйте в profiles/<имя>.yaml и замените значения. Все люди, каналы и домены вымышлены.
+# Схема: core/profile.py (неизвестный ключ — ошибка при старте).
+schema_version: 1
+kind: person
+name: "Иван Петров"
+display_name: "Иван Петров"
+aliases: ["Иван Петров финансист", "Петров Иван"]
+
+voice:
+  pronoun: auto
+  tone: "спокойный практик, объясняет на цифрах и примерах из малого бизнеса"
+  theses:
+    - "Учёт нужен, чтобы принимать решения, а не чтобы сдать отчёт"
+    - "Сначала навести порядок в деньгах, потом масштабироваться"
+    - "Автоматизировать то, что повторяется каждую неделю"
+  forbidden_words: ["гарантированно", "100%"]
+  forbidden_topics: ["политика", "медицинские советы"]
+  system_prompt_extra: ""
+
+seo:
+  target_query: "Иван Петров отзывы"
+  seed_topic: "Управленческий учёт и финансы для малого бизнеса"
+
+campaign_id: "demo0001"
+
+telegram:
+  channel: "@example_channel"
+  channel_title: "Финансы без паники"
+  contact: "@example_contact"
+  bot_username: null
+
+offer_tiers:
+  - id: diy
+    title: "Сделайте сами"
+    text: "Бесплатный чек-лист и разборы в канале — чтобы навести порядок в цифрах своими силами."
+    cta: "Забрать чек-лист"
+    url: null
+  - id: workshop
+    title: "Практикум"
+    text: "Четыре недели в небольшой группе: собираем управленческий учёт на вашем бизнесе."
+    cta: "Записаться на практикум"
+    url: "https://example.com/workshop"
+  - id: turnkey
+    title: "Разбор под ключ"
+    text: "Разберу ваши цифры лично и дам план на квартал."
+    cta: "Написать мне"
+    url: null
+
+lead_magnets:
+  - slug: audit
+    match: ["audit", "check", "finance"]
+    title: "Чек-лист: 12 мест, где малый бизнес теряет деньги"
+    download_filename: "Checklist_12_points.pdf"
+    file_prefix: "lead_magnet_audit.pdf"
+    desc: "Короткая самопроверка: платёжный календарь, дебиторка, маржа по продуктам, налоговые риски."
+    topic_name: "Финансовая самопроверка"
+    template: lead_magnet/checklist
+default_lead_magnet: audit
+
+platforms:
+  vc: {enabled: true}
+  spark: {enabled: true}
+  dzen: {enabled: false, editor_url: "https://dzen.ru/profile/editor/example"}
+  executive: {enabled: false}
+  tbank: {enabled: false}
+  biz360: {enabled: false}
+  rb: {enabled: false}
+
+radar:
+  feeds:
+    - {name: "VC.ru", url: "https://vc.ru/rss"}
+    - {name: "RB.RU", url: "https://rb.ru/feeds/all/"}
+  relevant_keywords: ["учёт", "налог", "усн", "маржа", "касс", "платёж"]
+  noise_keywords: ["гороскоп", "сериал", "крипт"]
+
+templates_dir: null
+
+generation:
+  mode: llm                 # llm — содержание пишет модель (нужен LLM_API_KEY); template — встроенные шаблоны
+  model: null               # null → LLM_MODEL из .env
+  temperature: 0.7
+  max_tokens: 4096
+  review_required: true     # статьи создаются черновиками (draft) и публикуются после одобрения в админке
+  language: ru
+
+deploy:
+  server_url: null

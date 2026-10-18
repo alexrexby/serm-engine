@@ -1,0 +1,48 @@
+{#- Lead magnet document (web HTML for PDF, autoescaped). Context: profile, preset, brand_name, channel, channel_url.
+    Offer block — shared partial (profile data). -#}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 12mm 15mm 12mm 15mm; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; line-height: 1.5; font-size: 13px; margin: 0; }
+  .header-cover { background: #0f172a; color: #ffffff; padding: 28px 24px; border-radius: 8px; margin-bottom: 20px; }
+  .header-badge { display: inline-block; background: #2563eb; color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; }
+  h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px 0; color: #ffffff; }
+  .subtitle { font-size: 13.5px; color: #94a3b8; margin: 0 0 14px 0; }
+  .author-meta { font-size: 11.5px; color: #cbd5e1; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 10px; }
+  h2 { color: #0f172a; font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin: 20px 0 12px 0; }
+  .point-card { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #f59e0b; padding: 12px 14px; margin-bottom: 10px; border-radius: 4px; page-break-inside: avoid; }
+  .point-card.danger { border-left-color: #ef4444; }
+  .point-title { font-weight: 700; margin-bottom: 4px; }
+  .risk-badge { display: inline-block; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 3px; margin-bottom: 4px; background: #fef3c7; color: #92400e; }
+  .danger .risk-badge { background: #fee2e2; color: #991b1b; }
+  .point-solution { background: #ffffff; padding: 6px 10px; border-radius: 4px; font-size: 11.5px; border: 1px dashed #cbd5e1; color: #0f766e; }
+</style>
+</head>
+<body>
+
+<div class="header-cover">
+  <div class="header-badge">{{ preset.badge }}</div>
+  <h1>{{ preset.title }}</h1>
+  <div class="subtitle">{{ preset.subtitle }}</div>
+  <div class="author-meta">Автор: <strong>{{ brand_name }}</strong> | Telegram: <a href="{{ channel_url }}" style="color: #cbd5e1;">{{ channel }}</a></div>
+</div>
+
+<p>{{ preset.manifest }}</p>
+
+<h2>Чек-лист</h2>
+{% for b in preset.blocks %}
+<div class="point-card {{ "danger" if b.severity == "danger" else "warning" }}">
+  <span class="risk-badge">{{ b.risk }}</span>
+  <div class="point-title">{{ b.title }}</div>
+  <div>{{ b.desc }}</div>
+  <div class="point-solution"><strong>Что сделать:</strong> {{ b.solution }}</div>
+</div>
+{% endfor %}
+
+{% include "partials/offer.html.j2" %}
+
+</body>
+</html>

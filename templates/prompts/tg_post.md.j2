@@ -1,0 +1,23 @@
+{#- Telegram posts pack task. Context: profile, brand, seo, news, articles [{title, platform}], max_chars.
+    Number and roles of posts are set here (5 by default); a profile overrides this template to change them. -#}
+{%- set roles = [
+    "наблюдение из практики: короткий инсайт, который меняет взгляд на тему",
+    "разбор ошибки: что пошло не так и какой вывод сделан",
+    "объяснение подхода или метода простыми словами",
+    "анонс материала по теме кампании: о чём он и кому полезен",
+    "практический совет: что читатель может сделать уже сегодня",
+] -%}
+{% include "prompts/partials/context.md.j2" %}
+Задача: напиши {{ roles | length }} постов для Telegram-канала «{{ profile.telegram.channel_title or profile.telegram.channel }}».
+Роли постов по порядку:
+{% for role in roles %}{{ loop.index }}. {{ role }}
+{% endfor %}
+{%- if articles %}
+Статьи кампании (можно на них опираться; ссылки не нужны):
+{% for article in articles %}- {{ article.title }}
+{% endfor %}
+{%- endif %}
+Каждый пост — не больше {{ max_chars }} знаков, без ссылок и @-упоминаний: ссылку на бота или канал система добавит в конец поста.
+
+Ответ — JSON:
+{"posts": [{"title": "короткое название поста для списка", "body": "текст поста"}]}

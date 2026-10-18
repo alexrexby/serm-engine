@@ -1,0 +1,32 @@
+# Секреты и окружение: .env монтируется в контейнер томом, в слой образа не попадает
+.env
+.env.*
+!.env.example
+
+# Рабочие данные установки (монтируются томом ./data)
+data/
+
+# Профили: в образ только примеры; свой профиль монтируется томом ./profiles
+profiles/*
+!profiles/example*.yaml
+!profiles/example*/
+
+# Окружение разработки, история, агенты, локальные скрипты владельца
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.github/
+.claude/
+.agents/
+.local/
+horizon/
+*.bak*
+.DS_Store
+
+# Артефакты сборки пакета и примеры деплоя (в образе не нужны)
+*.egg-info/
+build/
+dist/
+examples/

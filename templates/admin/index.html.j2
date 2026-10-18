@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERM Control | {{ profile.display_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #0a0f1d;
+    --card-bg: #121a2d;
+    --card-border: #1e293b;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 1020px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .logo-block h1 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 12px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.04);
+  }
+  .tab-btn.active {
+    background: var(--card-bg);
+    color: var(--accent);
+    border-color: var(--card-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .status-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .status-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .status-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .status-val {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot-green { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .dot-yellow { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+  .dot-red { background: var(--danger); }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 22px;
+    margin-bottom: 22px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+  }
+  .input-hint {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    gap: 8px;
+  }
+  input[type="text"], input[type="password"], select, textarea {
+    width: 100%;
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 13.5px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .btn {
+    background: var(--accent);
+    color: #0b1120;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+  }
+  .btn-outline:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-muted);
+  }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+  }
+  .btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+  .actions-bar {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--card-border);
+  }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1e293b;
+    border: 1px solid var(--accent);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    display: none;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 1000;
+  }
+  .news-card {
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .news-card:hover { border-color: rgba(56, 189, 248, 0.5); }
+  .news-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+  .news-source {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .score-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+  }
+  .score-high {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+  }
+  .news-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #fff;
+    text-decoration: none;
+  }
+  .news-title:hover { color: var(--accent); }
+  .news-desc {
+    font-size: 12.5px;
+    color: #94a3b8;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+  .vibecode-box {
+    background: #080d1a;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0;
+  }
+  .meat-point {
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    color: #cbd5e1;
+  }
+  .meat-point strong {
+    color: #f1f5f9;
+  }
+  .highlight-green {
+    color: #34d399;
+    font-weight: 700;
+  }
+  .prompt-box {
+    background: #030712;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+    font-size: 11.5px;
+    color: #a5f3fc;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 8px 0;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .meat-badge {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .lm-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .session-card {
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .session-title { font-size: 14px; font-weight: 700; }
+  .info-box {
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 6px;
+    padding: 14px 18px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    color: #e2e8f0;
+  }
+
+  /* Articles & Publishing Table */
+  .articles-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .articles-table-wrap {
+    background: #0b1120;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+  .articles-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+  }
+  .articles-table th {
+    background: #0f172a;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--card-border);
+    white-space: nowrap;
+  }
+  .articles-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #1e293b;
+    vertical-align: middle;
+  }
+  .articles-table tr:last-child td {
+    border-bottom: none;
+  }
+  .articles-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  
+  .plat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .plat-vc { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+  .plat-dzen { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .plat-spark { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+  .plat-executive { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.3); }
+  .plat-rb { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .plat-tbank { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+  .plat-biz360 { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+  .type-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .type-ugc { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+  .type-editorial { background: rgba(245, 158, 11, 0.12); color: #fbbf24; }
+
+  .status-tag {
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .st-published { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+  .st-ready { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+  .st-draft { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+  .st-failed { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+  /* Article Preview Modal */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+  }
+  .modal-box {
+    background: #0d1526;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 860px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+  }
+  .modal-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0f172a;
+  }
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-foot {
+    padding: 14px 20px;
+    border-top: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0f172a;
+    gap: 12px;
+  }
+  .markdown-content-box {
+    width: 100%;
+    min-height: 380px;
+    background: #060a12;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 14px;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', 'Menlo', Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    resize: vertical;
+    white-space: pre-wrap;
+  }
+  /* Modal Tabs & HTML Preview */
+  .modal-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 8px;
+  }
+  .modal-tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .modal-tab-btn:hover {
+    color: #fff;
+    background: #1e293b;
+  }
+  .modal-tab-btn.active {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  .html-preview-box {
+    width: 100%;
+    min-height: 380px;
+    max-height: 520px;
+    overflow-y: auto;
+    background: #080d18;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 24px 28px;
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .html-preview-box h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 10px 0 14px 0;
+    line-height: 1.3;
+  }
+  .html-preview-box h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #38bdf8;
+    margin: 24px 0 10px 0;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 6px;
+  }
+  .html-preview-box h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #93c5fd;
+    margin: 18px 0 8px 0;
+  }
+  .html-preview-box p {
+    margin-bottom: 14px;
+    color: #cbd5e1;
+  }
+  .html-preview-box p.lead-hook {
+    font-size: 14.5px;
+    font-style: italic;
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.08);
+    border-left: 3px solid #8b5cf6;
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 18px;
+  }
+  .html-preview-box blockquote {
+    border-left: 4px solid #38bdf8;
+    background: #0f172a;
+    padding: 12px 18px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+    font-style: italic;
+    color: #94a3b8;
+  }
+  .html-preview-box ul, .html-preview-box ol {
+    margin-bottom: 16px;
+    padding-left: 24px;
+  }
+  .html-preview-box li {
+    margin-bottom: 6px;
+  }
+  .html-preview-box table.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 13px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .html-preview-box table.styled-table th {
+    background: #1e293b;
+    color: #f1f5f9;
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid #334155;
+    font-weight: 600;
+  }
+  .html-preview-box table.styled-table td {
+    padding: 10px 14px;
+    border: 1px solid #334155;
+    color: #cbd5e1;
+  }
+  .html-preview-box table.styled-table tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .html-preview-box a {
+    color: #38bdf8;
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo-block">
+      <h1>Панель SERM <span class="badge">вход выполнен</span></h1>
+    </div>
+    <div class="header-actions">
+      <div style="font-size: 12.5px; color: var(--text-muted);">
+        Профиль: <strong>{{ profile.slug }}</strong>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="logout()">Выйти</button>
+    </div>
+  </header>
+
+  <div class="status-cards">
+    <div class="status-card">
+      <div class="status-label">Бот подписки</div>
+      <div class="status-val" id="botStatus">
+        <span class="dot dot-yellow"></span> Проверка...
+      </div>
+    </div>
+    <div class="status-card">
+      <div class="status-label">Канал</div>
+      <div class="status-val" id="channelStatus">{{ channel }}</div>
+    </div>
+    <div class="status-card">
+      <div class="status-label">Радар инфоповодов</div>
+      <div class="status-val" id="horizonCount">
+        <span class="dot dot-green"></span> Источников: {{ profile.radar.feeds|length }}
+      </div>
+    </div>
+    <div class="status-card">
+      <div class="status-label">Кампания</div>
+      <div class="status-val">{{ campaign_id }} ({{ profile.name }})</div>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('articles')">🚀 Статьи</button>
+    <button class="tab-btn" onclick="switchTab('analytics')">📊 Аналитика</button>
+    <button class="tab-btn" onclick="switchTab('secrets')">🔐 Токены и бот</button>
+    <button class="tab-btn" onclick="switchTab('horizon')">📡 Радар инфоповодов</button>
+    <button class="tab-btn" onclick="switchTab('leadmagnets')">📄 Лид-магниты</button>
+    <button class="tab-btn" onclick="switchTab('sessions')">🔑 Вход на площадки</button>
+  </div>
+
+  <!-- TAB 0: ARTICLES & ONE-CLICK PUBLISHING -->
+  <div id="tab-articles" class="tab-content active">
+    <div class="card">
+      <div class="card-title">
+        <span>🚀 Статьи кампании</span>
+        <span class="badge" id="articlesCountBadge">…</span>
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        Кампания <strong>{{ campaign_id }}</strong> ({{ profile.display_name }}). На UGC-площадках статьи публикуются автоматически, редакциям уходит питч.
+      </div>
+
+      <div class="articles-toolbar">
+        <div class="articles-filters">
+          <button class="filter-btn active" onclick="filterArticles('all')">Все</button>
+          <button class="filter-btn" onclick="filterArticles('ugc')">⚡ UGC (VC, Дзен, Spark, Exec)</button>
+          <button class="filter-btn" onclick="filterArticles('editorial')">📰 Редакции (Т-Банк, RB, Biz360)</button>
+          <button class="filter-btn" onclick="filterArticles('ready')">🟢 Готовы</button>
+          <button class="filter-btn" onclick="filterArticles('published')">🔗 Опубликованы</button>
+        </div>
+        <div class="articles-actions">
+          <button class="btn btn-sm btn-outline" onclick="loadArticles()">🔄 Обновить</button>
+          <button class="btn btn-sm btn-warning" onclick="triggerFastIndexManual()">⚡️ Fast-Index Ping</button>
+          <button class="btn btn-sm btn-success" id="btnPublishAllUgc" onclick="publishAllUGC()">🚀 Опубликовать все UGC</button>
+        </div>
+      </div>
+
+      <div id="articlesTableContainer">
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+          Загрузка статей кампании...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 1: SECRETS & BOTS -->
+  <div id="tab-secrets" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>🔐 Токены и настройки бота</span>
+      </div>
+
+      <form id="secretsForm">
+        <div class="form-group">
+          <label>Токен бота подписки</label>
+          <div class="input-wrapper">
+            <input type="password" id="oppBotToken" name="OPP_BOT_TOKEN" placeholder="7123456789:AAH..." autocomplete="new-password" data-secret disabled>
+            <button type="button" class="btn btn-outline" onclick="editSecret('oppBotToken')">✏️ Изменить</button>
+            <button type="button" class="btn btn-outline" onclick="toggleVisibility('oppBotToken')">👁</button>
+            <button type="button" class="btn btn-outline" onclick="verifyBotToken()">Тест токена</button>
+          </div>
+          <div class="input-hint">Токен из @BotFather. Этот бот проверяет подписку на канал и выдаёт материалы.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Канал, подписку на который проверяет бот</label>
+          <input type="text" id="oppChannel" name="OPP_CHANNEL" value="{{ channel }}" placeholder="@channel_name">
+          <div class="input-hint">Материал выдаётся только подписчикам этого канала.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Контакт для коммерческих заявок</label>
+          <input type="text" id="oppContact" name="OPP_CONTACT" value="{{ contact }}" placeholder="@username">
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--card-border); margin: 20px 0;">
+
+        <div class="form-group">
+          <label>Токен бота для быстрой индексации</label>
+          <div class="input-wrapper">
+            <input type="password" id="sermTgToken" name="SERM_TG_BOT_TOKEN" placeholder="Токен бота, который публикует ссылки в канал" autocomplete="new-password" data-secret disabled>
+            <button type="button" class="btn btn-outline" onclick="editSecret('sermTgToken')">✏️ Изменить</button>
+            <button type="button" class="btn btn-outline" onclick="toggleVisibility('sermTgToken')">👁</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Канал для быстрой индексации (ID или @имя)</label>
+          <input type="text" id="sermTgChannel" name="SERM_TG_CHANNEL_ID" placeholder="@serm_fast_index">
+          <div class="input-hint">Публичный канал, куда бот отправляет ссылку на новую статью, чтобы поисковики нашли её быстрее.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Токен VK (ссылка на стене для быстрой индексации)</label>
+          <div class="input-wrapper">
+            <input type="password" id="sermVkToken" name="SERM_VK_TOKEN" placeholder="vk1.a..." autocomplete="new-password" data-secret disabled>
+            <button type="button" class="btn btn-outline" onclick="editSecret('sermVkToken')">✏️ Изменить</button>
+            <button type="button" class="btn btn-outline" onclick="toggleVisibility('sermVkToken')">👁</button>
+          </div>
+        </div>
+
+        <div class="actions-bar">
+          <button type="submit" class="btn btn-success">💾 Сохранить</button>
+          <button type="button" class="btn btn-outline" onclick="reloadStatus()">🔄 Обновить статус</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB 2: HORIZON RADAR -->
+  <div id="tab-horizon" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>⚡️ Радар инфоповодов</span>
+        <div>
+          <button class="btn btn-outline btn-sm" onclick="loadHorizonNews(true)">🔄 Обновить источники</button>
+        </div>
+      </div>
+      <div class="info-box">
+        Каждый инфоповод раскладывается на прикладной разбор: в чём проблема для бизнеса, какое решение и какой эффект оно даёт.
+      </div>
+      <div id="horizonList">
+        <div style="text-align: center; padding: 30px; color: var(--text-muted);">Загрузка инфоповодов...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: DYNAMIC LEAD MAGNETS -->
+  <div id="tab-leadmagnets" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>📄 Лид-магниты</span>
+      </div>
+      <div class="info-box">
+        Чек-лист в PDF и Markdown — по готовой теме или по своей. В конце документа — блок «Что дальше» с форматами работы {{ profile.display_name }}{% if profile.offer_tiers %} ({% for tier in profile.offer_tiers %}{{ tier.title }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}.
+      </div>
+
+      <form id="lmGenForm">
+        <div class="form-group">
+          <label>Тема</label>
+          <select id="lmPreset" onchange="onPresetChange()">
+            {%- for lm in profile.lead_magnets %}
+            <option value="{{ lm.slug }}">{{ lm.title }}</option>
+            {%- endfor %}
+            <option value="custom">✏️ Своя тема</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="customTopicGroup" style="display: none;">
+          <label>Своя тема</label>
+          <input type="text" id="lmCustomTopic" placeholder="Например: снижение оттока клиентов">
+        </div>
+
+        <div class="actions-bar" style="margin-top: 10px;">
+          <button type="submit" class="btn btn-success" id="genLmBtn">🚀 Создать PDF и Markdown</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>📚 Готовые файлы</span>
+      </div>
+      <div id="lmLibraryList">
+        <div style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка файлов...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: SESSIONS & PUBLISHING -->
+  <div id="tab-sessions" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>🔑 Вход на площадки</span>
+      </div>
+      <div class="info-box">
+        <strong>Как происходит публикация:</strong><br>
+        1. <strong>UGC площадки (VC.ru, Spark.ru, Dzen.ru, E-xecutive.ru):</strong> Сервер запускает Playwright Chromium в headless-режиме, загружает сохраненную сессию, открывает редактор статьи, вставляет Markdown и публикует материал.<br>
+        2. <strong>Редакционные площадки (Т-Банк, Biz360.ru, RB.ru):</strong> Движок формирует структурированный питч-пакет и отправляет его в Telegram-бота редакции (@bs_community_bot) или через формы редакции.<br>
+        3. <strong>Как авторизоваться:</strong> Вставьте куки из своего браузера (из DevTools F12 &rarr; Application &rarr; Cookies или расширения Cookie-Editor) в поле нужной площадки и нажмите «Проверить и сохранить». Либо запустите на локальном компьютере <code>python3 cli.py login --platform vc</code> и затем <code>python3 cli.py sync-sessions</code>.
+      </div>
+
+      <!-- BROWSER EXTENSION CARD -->
+      <div class="card" style="background: linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, #0d1526 100%); border: 1px solid rgba(56, 189, 248, 0.4); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: 15px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>🧩 Расширение для браузера: SERM Cookie Sync</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Рекомендуется</span>
+            </div>
+            <div style="font-size: 12.5px; color: #94a3b8; margin-top: 4px;">
+              Автоматически считывает сессии из вашего браузера (VC.ru, Spark.ru, Dzen, E-xecutive) и передает их на сервер в 1 клик. Больше не нужно копировать куки руками!
+            </div>
+          </div>
+          <div>
+            <a href="/download/extension" class="btn btn-primary" style="text-decoration: none;">
+              ⬇️ Скачать расширение (ZIP)
+            </a>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #cbd5e1; background: #080d1a; padding: 12px 16px; border-radius: 6px; border: 1px solid #1e293b;">
+          <strong>Установка за 20 секунд:</strong>
+          <ol style="margin-left: 18px; margin-top: 6px; line-height: 1.6;">
+            <li>Скачайте ZIP-архив по кнопке выше и распакуйте в любую удобную папку.</li>
+            <li>Откройте страницу расширений (<code>chrome://extensions</code> или <code>browser://extensions</code> в Яндекс.Браузере), включите <em>«Режим разработчика»</em> в правом верхнем углу.</li>
+            <li>Нажмите <strong>«Загрузить распакованное расширение»</strong> и укажите распакованную папку.</li>
+            <li>Нажмите на иконку расширения — оно само определит открытую площадку и передаст куки на сервер.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- VC.ru -->
+      <div class="session-card">
+        <div class="session-header">
+          <div class="session-title">VC.ru (Личный блог / Трибуна)</div>
+          <span class="score-badge" id="vcStatusBadge">Проверка...</span>
+        </div>
+        <div class="input-hint" style="margin-bottom: 8px;">Вставьте cookie <code>connect.sid</code> или полный JSON куков:</div>
+        <textarea id="vcCookies" rows="2" placeholder="connect.sid=s%3A...; osnova-uuid=..."></textarea>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-outline btn-sm" onclick="saveSession('vc')">💾 Проверить и сохранить сессию VC.ru</button>
+        </div>
+      </div>
+
+      <!-- Spark.ru -->
+      <div class="session-card">
+        <div class="session-header">
+          <div class="session-title">Spark.ru (Бизнес-блог)</div>
+          <span class="score-badge" id="sparkStatusBadge">Проверка...</span>
+        </div>
+        <div class="input-hint" style="margin-bottom: 8px;">Вставьте cookie <code>_spark_session</code> или JSON:</div>
+        <textarea id="sparkCookies" rows="2" placeholder="_spark_session=..."></textarea>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-outline btn-sm" onclick="saveSession('spark')">💾 Проверить и сохранить сессию Spark.ru</button>
+        </div>
+      </div>
+
+      <!-- Dzen.ru -->
+      <div class="session-card">
+        <div class="session-header">
+          <div class="session-title">Dzen.ru (Дзен-Студия / Яндекс ID)</div>
+          <span class="score-badge" id="dzenStatusBadge">Проверка...</span>
+        </div>
+        <div class="input-hint" style="margin-bottom: 8px;">Вставьте cookie <code>Session_id</code> от Яндекс ID или JSON:</div>
+        <textarea id="dzenCookies" rows="2" placeholder="Session_id=3%3A...; yandexuid=..."></textarea>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-outline btn-sm" onclick="saveSession('dzen')">💾 Проверить и сохранить сессию Дзена</button>
+        </div>
+      </div>
+
+      <!-- E-xecutive.ru -->
+      <div class="session-card">
+        <div class="session-header">
+          <div class="session-title">E-xecutive.ru (Кабинет автора сообщества)</div>
+          <span class="score-badge" id="executiveStatusBadge">Проверка...</span>
+        </div>
+        <div class="input-hint" style="margin-bottom: 8px;">Вставьте cookie <code>PHPSESSID</code> или JSON:</div>
+        <textarea id="executiveCookies" rows="2" placeholder="PHPSESSID=..."></textarea>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-outline btn-sm" onclick="saveSession('executive')">💾 Проверить и сохранить сессию E-xecutive</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: ANALYTICS & CONVERSIONS -->
+  <div id="tab-analytics" class="tab-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+          📊 Аналитика воронки
+        </h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          Критерий принятия решений: выборка 50–100 уникальных переходов &bull; Воронка: Публикация &rarr; Переход в бота &rarr; Подписка на {{ channel }} &rarr; Выдача PDF &rarr; Заявки
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="analyticsLastUpdated" style="font-size: 11.5px; color: var(--text-muted);">Обновление...</span>
+        <button class="btn btn-sm btn-outline" onclick="loadAnalytics()">🔄 Обновить</button>
+      </div>
+    </div>
+
+    <!-- SAMPLE SIZE PROGRESS & TARGET MILESTONE CARD -->
+    <div class="card" id="sampleMilestoneCard" style="margin-bottom: 22px; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.25); box-shadow: 0 4px 20px rgba(0,0,0,0.3); border-radius: 8px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="font-size: 20px;">🎯</span>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #f8fafc;">
+              Статистическая выборка: ориентир 50–100 уникальных переходов
+            </h3>
+            <span id="sampleStatusBadge" class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 600; padding: 4px 10px; border-radius: 12px; font-size: 12px;">
+              Калибровка (0/50 мин.)
+            </span>
+          </div>
+          <div id="sampleDescText" style="font-size: 13px; color: #94a3b8; margin-top: 6px; line-height: 1.45;">
+            Решения принимаются по объёму выборки, а не по календарным датам. На меньшем объёме разница между темами может оказаться случайной.
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Прогресс выборки</div>
+          <div style="font-size: 24px; font-weight: 800; color: #38bdf8;">
+            <span id="sampleCountDisplay">0</span> <span style="font-size: 14px; font-weight: 500; color: #64748b;">/ 100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MULTI-STAGE PROGRESS BAR -->
+      <div style="position: relative; margin-top: 10px; margin-bottom: 24px;">
+        <div style="height: 14px; background: #1e293b; border-radius: 7px; overflow: hidden; position: relative;">
+          <div id="sampleProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #f59e0b 0%, #38bdf8 50%, #10b981 100%); border-radius: 7px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+        </div>
+        <!-- Markers -->
+        <div style="position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: rgba(255,255,255,0.4); z-index: 2;" title="Минимум: 50 переходов"></div>
+        <div style="position: absolute; right: 0%; top: -3px; bottom: -3px; width: 2px; background: rgba(16, 185, 129, 0.8); z-index: 2;" title="Цель: 100 переходов"></div>
+      </div>
+
+      <!-- MILESTONE LABELS -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
+        <div style="background: rgba(30, 41, 59, 0.6); padding: 10px 12px; border-radius: 6px; border-left: 3px solid #f59e0b;">
+          <div style="font-weight: 700; color: #f8fafc; display: flex; justify-content: space-between;">
+            <span>Этап 1: 50 переходов</span>
+            <span style="color: #f59e0b;">Минимальный порог</span>
+          </div>
+          <div style="color: #94a3b8; font-size: 11.5px; margin-top: 3px;">
+            Видны первые лидеры, явно слабые темы можно отсеять.
+          </div>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.6); padding: 10px 12px; border-radius: 6px; border-left: 3px solid #10b981;">
+          <div style="font-weight: 700; color: #f8fafc; display: flex; justify-content: space-between;">
+            <span>Этап 2: 100 переходов</span>
+            <span style="color: #10b981;">Можно делать выводы</span>
+          </div>
+          <div style="color: #94a3b8; font-size: 11.5px; margin-top: 3px;">
+            Разницу между темами уже можно учитывать в контент-плане.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="status-cards" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px;">
+      <div class="status-card" style="border-top: 3px solid #38bdf8;">
+        <div class="status-label">Переходы в бота</div>
+        <div class="status-val" id="kpiStarts" style="font-size: 26px; font-weight: 800; color: #38bdf8;">0</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Уникальные переходы по ссылкам</div>
+      </div>
+      <div class="status-card" style="border-top: 3px solid #10b981;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="status-label">Подписки</div>
+          <span class="badge" id="badgeCrSub" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">CR: 0%</span>
+        </div>
+        <div class="status-val" id="kpiSubs" style="font-size: 26px; font-weight: 800; color: #10b981;">0</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Подписались на {{ channel }}</div>
+      </div>
+      <div class="status-card" style="border-top: 3px solid #818cf8;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="status-label">Выдано материалов</div>
+          <span class="badge" id="badgeCrPdf" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">CR: 0%</span>
+        </div>
+        <div class="status-val" id="kpiPdfs" style="font-size: 26px; font-weight: 800; color: #818cf8;">0</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Получили материал в боте</div>
+      </div>
+      <div class="status-card" style="border-top: 3px solid #f59e0b;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="status-label">Заявки</div>
+          <span class="badge" id="badgeCrLead" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">CR: 0%</span>
+        </div>
+        <div class="status-val" id="kpiLeads" style="font-size: 26px; font-weight: 800; color: #f59e0b;">0</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Выбрали платный формат в боте</div>
+      </div>
+    </div>
+
+    <!-- FUNNEL VISUALIZATION -->
+    <div class="card" style="margin-bottom: 22px;">
+      <div class="card-title">
+        <span>📈 Воронка: от перехода до заявки</span>
+      </div>
+      <div id="funnelVisualContainer" style="padding: 10px 0;">
+        <div style="color: var(--text-muted); font-size: 12.5px;">Загрузка этапов воронки...</div>
+      </div>
+    </div>
+
+    <!-- AI STRATEGY RECOMMENDATIONS -->
+    <div class="card" style="margin-bottom: 22px; background: linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, #121a2d 100%); border: 1px solid rgba(56, 189, 248, 0.3);">
+      <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">💡</span>
+        <span>Что поменять в контенте</span>
+      </div>
+      <div id="strategyRecsContainer">
+        <div style="color: var(--text-muted); font-size: 12.5px;">Формирование рекомендаций...</div>
+      </div>
+    </div>
+
+    <!-- TOPIC & SLUG BREAKDOWN TABLE -->
+    <div class="card" style="margin-bottom: 22px;">
+      <div class="card-title">
+        <span>🎯 Эффективность по темам и лид-магнитам</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--card-border); text-align: left; color: var(--text-muted); font-size: 11.5px; text-transform: uppercase;">
+              <th style="padding: 10px;">Тема / метка</th>
+              <th style="padding: 10px; text-align: center;">Входы</th>
+              <th style="padding: 10px; text-align: center;">Подписки</th>
+              <th style="padding: 10px; text-align: center;">% подписок</th>
+              <th style="padding: 10px; text-align: center;">PDF</th>
+              <th style="padding: 10px; text-align: center;">Заявки</th>
+              <th style="padding: 10px; text-align: center;">% заявок</th>
+              <th style="padding: 10px; text-align: right;">Оценка</th>
+            </tr>
+          </thead>
+          <tbody id="topicBreakdownTbody">
+            <tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка аналитики по темам...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LIVE EVENTS FEED -->
+    <div class="card">
+      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>⚡️ Последние события в боте</span>
+        <span style="font-size: 11px; color: var(--text-muted);" id="eventsCountBadge">0 событий</span>
+      </div>
+      <div style="overflow-x: auto; max-height: 380px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--card-border); text-align: left; color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
+              <th style="padding: 8px 10px;">Время</th>
+              <th style="padding: 8px 10px;">Пользователь</th>
+              <th style="padding: 8px 10px;">Действие</th>
+              <th style="padding: 8px 10px;">Тема / Источник</th>
+              <th style="padding: 8px 10px;">Детали</th>
+            </tr>
+          </thead>
+          <tbody id="liveEventsTbody">
+            <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка событий...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARTICLE PREVIEW & ACTION MODAL -->
+<div id="articleModal" class="modal-overlay" onclick="closeArticleModalOnBackdrop(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="modalPlatformBadge" class="plat-pill">VC.ru</span>
+          <span id="modalTypeBadge" class="type-tag type-ugc">UGC</span>
+          <span id="modalStatusBadge" class="status-tag status-ready">Готова</span>
+        </div>
+        <div id="modalArticleTitle" style="font-size: 16px; font-weight: 700; color: #fff; margin-top: 8px;">Заголовок статьи</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeArticleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: var(--text-muted);">
+        <span id="modalMetaInfo">Слов: 0 | Символов: 0</span>
+        <span id="modalLeadMagnetInfo">Лид-магнит (PDF)</span>
+      </div>
+      <div id="modalPitchBlock" style="display: none; margin-bottom: 14px; background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 12px;">
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 6px;">📨 Готовый питч для редакции:</div>
+        <pre id="modalPitchText" style="white-space: pre-wrap; font-size: 12px; color: #d1d5db; margin: 0; font-family: inherit;"></pre>
+      </div>
+
+      <div class="modal-tabs">
+        <button id="tabBtnPreview" class="modal-tab-btn active" onclick="switchModalTab('preview')">👁 Вёрстка на площадке (HTML)</button>
+        <button id="tabBtnMarkdown" class="modal-tab-btn" onclick="switchModalTab('markdown')">📄 Исходник (Markdown)</button>
+      </div>
+
+      <div id="modalViewPreview">
+        <div id="modalHtmlPreviewBox" class="html-preview-box"></div>
+      </div>
+      <div id="modalViewMarkdown" style="display: none;">
+        <textarea id="modalMarkdownContent" class="markdown-content-box" readonly></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-outline btn-sm" onclick="copyModalHtml()">📋 Скопировать HTML</button>
+        <button class="btn btn-outline btn-sm" onclick="copyModalMarkdown()">📋 Скопировать Markdown</button>
+        <button class="btn btn-outline btn-sm" id="btnCopyPitch" onclick="copyModalPitch()" style="display: none;">✉️ Скопировать питч</button>
+      </div>
+      <div id="modalPublishAction" style="display: flex; gap: 8px; align-items: center;">
+        <!-- Dynamic Action Button -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer style="text-align: center; font-size: 12px; color: var(--text-muted); padding: 24px 0;">
+  SERM Distribution Engine &middot; AGPL-3.0-or-later &middot;
+  {% if source_url %}<a href="{{ source_url }}" target="_blank" rel="noopener" style="color: var(--text-muted);">Исходный код</a>{% else %}Исходный код — в каталоге установки{% endif %}
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const CAMPAIGN_ID = {{ campaign_id|tojson }};
+  let cachedNews = [];
+  let cachedArticles = [];
+  let currentFilter = 'all';
+  let activeModalArticle = null;
+
+  // Data from the API (Telegram names, /start arguments, RSS, LLM output) never reaches innerHTML raw:
+  // esc() for text and attribute values, safeUrl() for href, jsArg() for arguments of inline handlers.
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function safeUrl(value) {
+    const url = String(value ?? '').trim();
+    return /^(https?:\/\/|\/(?!\/))/i.test(url) ? url : '#';
+  }
+
+  function jsArg(value) {
+    return esc(JSON.stringify(String(value ?? '')));
+  }
+
+  // Article HTML preview: parsed in an inert document, only allow-listed tags are copied with `class` (styling) and a safe href
+  const PREVIEW_TAGS = new Set(['H1', 'H2', 'H3', 'H4', 'P', 'BR', 'HR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'CODE', 'PRE',
+    'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'DIV', 'SPAN']);
+  const PREVIEW_DROP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH']);
+
+  function safeHtml(html) {
+    const copy = (src, dst) => {
+      src.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          dst.appendChild(document.createTextNode(node.textContent));
+        } else if (node.nodeType === Node.ELEMENT_NODE && !PREVIEW_DROP.has(node.tagName)) {
+          if (!PREVIEW_TAGS.has(node.tagName)) {
+            copy(node, dst);
+            return;
+          }
+          const el = document.createElement(node.tagName);
+          if (node.hasAttribute('class')) el.className = node.getAttribute('class');
+          if (node.tagName === 'A') {
+            el.href = safeUrl(node.getAttribute('href'));
+            el.target = '_blank';
+            el.rel = 'noopener';
+          }
+          copy(node, el);
+          dst.appendChild(el);
+        }
+      });
+    };
+    const fragment = document.createDocumentFragment();
+    copy(new DOMParser().parseFromString(String(html ?? ''), 'text/html').body, fragment);
+    return fragment;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 4500);
+  }
+
+  function toggleVisibility(id) {
+    const el = document.getElementById(id);
+    el.type = el.type === 'password' ? 'text' : 'password';
+  }
+
+  function editSecret(id) {
+    const el = document.getElementById(id);
+    el.disabled = false;
+    el.value = '';
+    el.focus();
+  }
+
+  function lockSecrets() {
+    document.querySelectorAll('#secretsForm input[data-secret]').forEach(el => {
+      el.value = '';
+      el.disabled = true;
+    });
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('tab-' + tabId).classList.add('active');
+
+    if (tabId === 'articles' && cachedArticles.length === 0) loadArticles();
+    if (tabId === 'analytics') loadAnalytics();
+    if (tabId === 'horizon' && cachedNews.length === 0) loadHorizonNews();
+    if (tabId === 'leadmagnets') loadLeadMagnets();
+    if (tabId === 'sessions') loadSessionsStatus();
+  }
+
+  function filterArticles(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.articles-filters .filter-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    renderArticlesTable();
+  }
+
+  async function loadArticles() {
+    const container = document.getElementById('articlesTableContainer');
+    container.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">Загрузка статей из базы данных...</div>';
+    try {
+      const res = await fetch('/api/articles/list?campaign=' + encodeURIComponent(CAMPAIGN_ID));
+      if (res.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+      const data = await res.json();
+      cachedArticles = data.articles || [];
+      document.getElementById('articlesCountBadge').innerText = cachedArticles.length + ' статей';
+      renderArticlesTable();
+    } catch (e) {
+      container.innerHTML = '<div style="color: var(--danger); padding: 20px;">Ошибка загрузки статей: ' + esc(e) + '</div>';
+    }
+  }
+
+  function renderArticlesTable() {
+    const container = document.getElementById('articlesTableContainer');
+    if (!cachedArticles || cachedArticles.length === 0) {
+      container.innerHTML = '<div style="text-align: center; padding: 30px;">Нет статей в кампании.</div>';
+      return;
+    }
+
+    let filtered = cachedArticles.filter(a => {
+      if (currentFilter === 'all') return true;
+      if (currentFilter === 'ugc') return ['vc', 'spark', 'dzen', 'executive'].includes(a.platform);
+      if (currentFilter === 'editorial') return ['tbank', 'biz360', 'rb'].includes(a.platform);
+      if (currentFilter === 'ready') return a.status === 'ready';
+      if (currentFilter === 'published') return a.status === 'published';
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">Нет статей, соответствующих фильтру.</div>';
+      return;
+    }
+
+    let html = `
+      <table class="articles-table">
+        <thead>
+          <tr>
+            <th style="width: 130px;">Площадка</th>
+            <th>Заголовок и ключевые тезисы</th>
+            <th style="width: 140px;">Лид-магнит</th>
+            <th style="width: 140px;">Статус</th>
+            <th style="width: 220px; text-align: right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    filtered.forEach((a, idx) => {
+      const isUGC = ['vc', 'spark', 'dzen', 'executive'].includes(a.platform);
+      const platClass = 'plat-' + a.platform;
+      const platName = a.platform_name || a.platform.toUpperCase();
+      const typeLabel = isUGC ? 'UGC' : 'Редакция';
+      const typeBadgeClass = isUGC ? 'type-ugc' : 'type-editorial';
+
+      let statusBadge = '';
+      if (a.status === 'published') {
+        statusBadge = '<span class="status-tag status-published">🟢 Опубликовано</span>';
+      } else if (a.status === 'draft') {
+        statusBadge = '<span class="status-tag status-ready">📝 Черновик</span>';
+      } else if (a.status === 'failed') {
+        statusBadge = '<span class="status-tag status-failed" title="' + esc(a.error_message) + '">🔴 Ошибка</span>';
+      } else {
+        statusBadge = '<span class="status-tag status-ready">⚪️ Готова к публикации</span>';
+      }
+
+      let actionsHtml = '';
+      if (isUGC) {
+        if (a.status === 'published' && a.published_url) {
+          actionsHtml = `
+            <a href="${esc(safeUrl(a.published_url))}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;">🔗 Читать</a>
+            <button class="btn btn-sm btn-warning" onclick="triggerFastIndexForUrl(${jsArg(a.published_url)}, ${jsArg(encodeURIComponent(a.title))})">⚡️ Пинг</button>
+            <button class="btn btn-sm btn-outline" onclick="openArticleModal(${jsArg(a.id)})">👁 Текст</button>
+          `;
+        } else {
+          actionsHtml = `
+            <button class="btn btn-sm btn-outline" onclick="openArticleModal(${jsArg(a.id)})">👁 Текст</button>
+            <button class="btn btn-sm btn-success" id="btnPub_${esc(a.id)}" onclick="publishArticle(${jsArg(a.id)}, ${jsArg(a.platform)})">🚀 Опубликовать</button>
+          `;
+        }
+      } else {
+        // Editorial
+        const formLink = a.platform === 'tbank' ? 'https://t.me/bs_community_bot' :
+                         a.platform === 'biz360' ? 'https://biz360.ru/about/feedback/' :
+                         'https://rb.ru/opinion/';
+        actionsHtml = `
+          <button class="btn btn-sm btn-outline" onclick="openArticleModal(${jsArg(a.id)})">👁 Питч &amp; Текст</button>
+          <a href="${formLink}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;" title="Открыть канал/форму подачи материала">✉️ Подать ↗</a>
+        `;
+      }
+
+      if (a.status === 'draft') {
+        actionsHtml = `
+          <button class="btn btn-sm btn-outline" onclick="openArticleModal(${jsArg(a.id)})">👁 Текст</button>
+          <button class="btn btn-sm btn-success" id="btnApprove_${esc(a.id)}" onclick="approveArticle(${jsArg(a.id)})">✅ Одобрить</button>
+        `;
+      }
+
+      const publishedLink = a.published_url ? `
+        <div style="margin-top: 4px; font-size: 11px;">
+          <a href="${esc(safeUrl(a.published_url))}" target="_blank" style="color: #38bdf8; text-decoration: none;">🔗 ${esc(a.published_url)}</a>
+        </div>
+      ` : '';
+
+      html += `
+        <tr>
+          <td>
+            <div class="plat-pill ${esc(platClass)}">${esc(platName)}</div>
+            <div style="margin-top: 5px;">
+              <span class="type-tag ${typeBadgeClass}">${typeLabel}</span>
+            </div>
+          </td>
+          <td>
+            <div style="font-weight: 600; font-size: 13.5px; color: #f1f5f9; margin-bottom: 4px;">${esc(a.title)}</div>
+            <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">${esc((a.lead || '').slice(0, 140))}...</div>
+            ${publishedLink}
+          </td>
+          <td>
+            <div style="font-size: 11.5px; font-weight: 600; color: #94a3b8;">📄 В конце статьи</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Блок «Что дальше»</div>
+          </td>
+          <td>
+            ${statusBadge}
+          </td>
+          <td style="text-align: right;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+              ${actionsHtml}
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  async function openArticleModal(articleId) {
+    showToast('Загрузка текста статьи...');
+    try {
+      const res = await fetch('/api/articles/content?id=' + articleId);
+      const data = await res.json();
+      if (!data.success) {
+        showToast('❌ Ошибка: ' + (data.error || 'Статья не найдена'));
+        return;
+      }
+      activeModalArticle = data.article;
+      const art = data.article;
+
+      const isUGC = ['vc', 'spark', 'dzen', 'executive'].includes(art.platform);
+      const platBadge = document.getElementById('modalPlatformBadge');
+      platBadge.className = 'plat-pill plat-' + art.platform;
+      platBadge.innerText = art.platform_name || art.platform.toUpperCase();
+
+      const typeBadge = document.getElementById('modalTypeBadge');
+      typeBadge.className = 'type-tag ' + (isUGC ? 'type-ugc' : 'type-editorial');
+      typeBadge.innerText = isUGC ? 'UGC' : 'Редакция';
+
+      const statusBadge = document.getElementById('modalStatusBadge');
+      statusBadge.className = 'status-tag ' + (art.status === 'published' ? 'status-published' : 'status-ready');
+      statusBadge.innerText = art.status === 'published' ? '🟢 Опубликовано' : '⚪️ Готова к публикации';
+
+      document.getElementById('modalArticleTitle').innerText = art.title;
+      document.getElementById('modalMarkdownContent').value = art.content_markdown;
+      const previewBox = document.getElementById('modalHtmlPreviewBox');
+      if (art.content_html) previewBox.replaceChildren(safeHtml(art.content_html));
+      else previewBox.innerHTML = '<p style="color:#ef4444;">HTML вёрстка не сформирована</p>';
+      switchModalTab('preview');
+      
+      const words = (art.content_markdown || '').split(/\s+/).filter(Boolean).length;
+      const chars = (art.content_markdown || '').length;
+      document.getElementById('modalMetaInfo').innerText = 'Слов: ' + words + ' | Символов: ' + chars + ' | Время чтения: ~' + Math.ceil(words / 180) + ' мин';
+
+      // Pitch block for editorial
+      const pitchBlock = document.getElementById('modalPitchBlock');
+      const btnCopyPitch = document.getElementById('btnCopyPitch');
+      if (data.pitch_text) {
+        pitchBlock.style.display = 'block';
+        document.getElementById('modalPitchText').innerText = data.pitch_text;
+        btnCopyPitch.style.display = 'inline-block';
+      } else {
+        pitchBlock.style.display = 'none';
+        btnCopyPitch.style.display = 'none';
+      }
+
+      // Modal action button
+      const actEl = document.getElementById('modalPublishAction');
+      if (isUGC) {
+        if (art.status === 'published' && art.published_url) {
+          actEl.innerHTML = `
+            <a href="${esc(safeUrl(art.published_url))}" target="_blank" class="btn btn-outline btn-sm">🔗 Открыть на ${esc(platBadge.innerText)} ↗</a>
+          `;
+        } else if (art.status === 'draft') {
+          actEl.innerHTML = `
+            <button class="btn btn-success btn-sm" onclick="approveArticle(${jsArg(art.id)}); closeArticleModal();">✅ Одобрить к публикации</button>
+          `;
+        } else {
+          actEl.innerHTML = `
+            <button class="btn btn-success btn-sm" onclick="publishArticle(${jsArg(art.id)}, ${jsArg(art.platform)}); closeArticleModal();">🚀 Опубликовать на ${esc(platBadge.innerText)}</button>
+          `;
+        }
+      } else {
+        const link = art.platform === 'tbank' ? 'https://t.me/bs_community_bot' :
+                     art.platform === 'biz360' ? 'https://biz360.ru/about/feedback/' :
+                     'https://rb.ru/opinion/';
+        actEl.innerHTML = `
+          <a href="${link}" target="_blank" class="btn btn-primary btn-sm">✉️ Открыть канал подачи материала ↗</a>
+        `;
+      }
+
+      document.getElementById('articleModal').style.display = 'flex';
+    } catch (e) {
+      showToast('❌ Ошибка загрузки статьи');
+    }
+  }
+
+  function closeArticleModal() {
+    document.getElementById('articleModal').style.display = 'none';
+    activeModalArticle = null;
+  }
+
+  function closeArticleModalOnBackdrop(e) {
+    if (e.target.id === 'articleModal') {
+      closeArticleModal();
+    }
+  }
+
+  function switchModalTab(tab) {
+    const btnPrev = document.getElementById('tabBtnPreview');
+    const btnMd = document.getElementById('tabBtnMarkdown');
+    const viewPrev = document.getElementById('modalViewPreview');
+    const viewMd = document.getElementById('modalViewMarkdown');
+
+    if (tab === 'preview') {
+      btnPrev.classList.add('active');
+      btnMd.classList.remove('active');
+      viewPrev.style.display = 'block';
+      viewMd.style.display = 'none';
+    } else {
+      btnMd.classList.add('active');
+      btnPrev.classList.remove('active');
+      viewMd.style.display = 'block';
+      viewPrev.style.display = 'none';
+    }
+  }
+
+  function copyModalHtml() {
+    if (!activeModalArticle) return;
+    const html = activeModalArticle.content_html || document.getElementById('modalHtmlPreviewBox').innerHTML;
+    navigator.clipboard.writeText(html);
+    showToast('✅ Полный HTML код статьи скопирован в буфер!');
+  }
+
+  function copyModalMarkdown() {
+    if (!activeModalArticle) return;
+    navigator.clipboard.writeText(activeModalArticle.content_markdown);
+    showToast('✅ Полный текст Markdown скопирован в буфер!');
+  }
+
+  function copyModalPitch() {
+    const text = document.getElementById('modalPitchText').innerText;
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    showToast('✅ Питч для редакции скопирован в буфер!');
+  }
+
+  async function publishArticle(articleId, platform) {
+    const btn = document.getElementById('btnPub_' + articleId);
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = '⏳ Публикация...';
+    }
+    showToast('🚀 Публикуем на ' + platform.toUpperCase() + '…');
+
+    try {
+      const res = await fetch('/api/publish/article', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: articleId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Успешно опубликовано на ' + platform.toUpperCase() + '! ' + (data.published_url || ''));
+        loadArticles();
+      } else {
+        showToast('❌ Ошибка публикации (' + platform + '): ' + (data.error || data.message));
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '🚀 Повторить';
+        }
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сети при публикации: ' + e);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '🚀 Опубликовать';
+      }
+    }
+  }
+
+  async function approveArticle(articleId) {
+    const btn = document.getElementById('btnApprove_' + articleId);
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/articles/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: articleId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Статья одобрена и готова к публикации');
+        loadArticles();
+      } else {
+        showToast('❌ ' + (data.error || 'Не удалось одобрить статью'));
+        if (btn) btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сети: ' + e);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function publishAllUGC() {
+    const btn = document.getElementById('btnPublishAllUgc');
+    btn.disabled = true;
+    btn.innerText = '⏳ Публикация UGC пакета...';
+    showToast('🚀 Запуск очереди публикации на VC.ru, Spark, Дзен, E-xecutive...');
+
+    try {
+      const res = await fetch('/api/publish/campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: CAMPAIGN_ID, fast_index: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Пакетная публикация завершена! Результаты обновлены.');
+      } else {
+        showToast('⚠️ Публикация завершилась с замечаниями: ' + (data.error || 'см. таблицу'));
+      }
+      loadArticles();
+    } catch (e) {
+      showToast('❌ Ошибка пакетной публикации: ' + e);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = '🚀 Опубликовать все UGC';
+    }
+  }
+
+  async function triggerFastIndexForUrl(url, titleEnc) {
+    const title = decodeURIComponent(titleEnc);
+    showToast('⚡️ Отправляем ссылку на быструю индексацию (Telegram, VK, IndexNow)…');
+    try {
+      const res = await fetch('/api/fast-index/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, title })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Ссылка отправлена на быструю индексацию');
+      } else {
+        showToast('⚠️ Fast-Index: ' + (data.message || 'Ошибки доставки'));
+      }
+    } catch (e) {
+      showToast('❌ Ошибка отправки Fast-Index: ' + e);
+    }
+  }
+
+  function triggerFastIndexManual() {
+    const url = prompt('Ссылка на статью для быстрой индексации (Telegram, VK, IndexNow):');
+    if (!url) return;
+    const title = prompt('Заголовок материала (необязательно):', {{ fast_index_title|tojson }}) || 'Новый материал';
+    triggerFastIndexForUrl(url, encodeURIComponent(title));
+  }
+
+  function onPresetChange() {
+    const val = document.getElementById('lmPreset').value;
+    document.getElementById('customTopicGroup').style.display = (val === 'custom') ? 'block' : 'none';
+  }
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/admin';
+  }
+
+  async function reloadStatus() {
+    try {
+      const res = await fetch('/api/status');
+      if (res.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+      const data = await res.json();
+      const bStatus = document.getElementById('botStatus');
+      if (data.bot_online) {
+        bStatus.innerHTML = '<span class="dot dot-green"></span> Онлайн (@' + esc(data.bot_username) + ')';
+      } else if (data.has_token) {
+        bStatus.innerHTML = '<span class="dot dot-yellow"></span> Ошибка запуска бота';
+      } else {
+        bStatus.innerHTML = '<span class="dot dot-yellow"></span> Токен не задан';
+      }
+
+      document.getElementById('channelStatus').innerText = data.opp_channel || {{ channel|tojson }};
+      if (data.opp_bot_token) document.getElementById('oppBotToken').placeholder = 'Задан: ' + data.opp_bot_token;
+      if (data.opp_channel) document.getElementById('oppChannel').value = data.opp_channel;
+      if (data.opp_contact) document.getElementById('oppContact').value = data.opp_contact;
+      if (data.serm_tg_token) document.getElementById('sermTgToken').placeholder = 'Задан: ' + data.serm_tg_token;
+      if (data.serm_tg_channel) document.getElementById('sermTgChannel').value = data.serm_tg_channel;
+      if (data.serm_vk_token) document.getElementById('sermVkToken').placeholder = 'Задан: ' + data.serm_vk_token;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadHorizonNews(refresh = false) {
+    const listEl = document.getElementById('horizonList');
+    listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted);">Сбор свежих инфоповодов...</div>';
+    try {
+      const url = '/api/horizon/news' + (refresh ? '?refresh=1' : '');
+      const res = await fetch(url);
+      const data = await res.json();
+      cachedNews = data.news || [];
+      document.getElementById('horizonCount').innerHTML = '<span class="dot dot-green"></span> ' + cachedNews.length + ' инфоповодов';
+
+      if (cachedNews.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px;">Нет свежих новостей. Нажмите «Обновить источники».</div>';
+        return;
+      }
+
+      let html = '';
+      cachedNews.forEach((item, idx) => {
+        const isHigh = (item.business_score || 5) >= 7.0;
+        const scoreClass = isHigh ? 'score-high' : '';
+        const title = item.applied_title ? `⚡️ [Разбор] ${esc(item.applied_title)}` : esc(item.title);
+        const rawHook = item.applied_title ? `<div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Триггер рынка: <em>«${esc(item.title)}»</em></div>` : '';
+        
+        const holeBox = item.business_hole ? `
+          <div class="meat-point">💥 <strong>Проблема бизнеса:</strong> ${esc(item.business_hole)}</div>
+        ` : '';
+        
+        const solutionBox = item.vibecode_solution ? `
+          <div class="meat-point">🛠 <strong>Решение:</strong> ${esc(item.vibecode_solution)}</div>
+        ` : '';
+
+        const impactBox = item.financial_impact ? `
+          <div class="meat-point">💰 <strong>Экономический эффект:</strong> <span class="highlight-green">${esc(item.financial_impact)}</span></div>
+        ` : '';
+
+        const promptBox = item.cursor_prompt ? `
+          <div style="margin-top: 10px;">
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">📋 Готовый промпт:</div>
+            <pre class="prompt-box" id="prompt_${idx}">${esc(item.cursor_prompt)}</pre>
+          </div>
+        ` : '';
+
+        html += `
+          <div class="news-card">
+            <div class="news-header">
+              <span class="news-source">📌 ${esc(item.source_name)} | ${esc(item.published_at || 'Сегодня')}</span>
+              <span class="score-badge ${scoreClass}">⚡ Значимость для бизнеса: ${esc(item.business_score || 9)}/10</span>
+            </div>
+            <div class="news-title" style="font-size: 15px; margin-bottom: 4px;">${title}</div>
+            ${rawHook}
+            <div class="vibecode-box">
+              ${holeBox}
+              ${solutionBox}
+              ${impactBox}
+              ${promptBox}
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${item.cursor_prompt ? `<button class="btn btn-sm btn-outline" onclick="copyCursorPrompt(${idx})">📋 Скопировать промпт</button>` : ''}
+              <button class="btn btn-sm btn-success" onclick="synthesizeNews(${idx})">🚀 Сделать статьи и лид-магнит по этой новости</button>
+              ${item.link ? `<a href="${esc(safeUrl(item.link))}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;">Оригинал ↗</a>` : ''}
+            </div>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+    } catch (e) {
+      listEl.innerHTML = '<div style="color: var(--danger); padding: 20px;">Не удалось загрузить инфоповоды: ' + esc(e) + '</div>';
+    }
+  }
+
+  function copyCursorPrompt(idx) {
+    const item = cachedNews[idx];
+    if (!item || !item.cursor_prompt) return;
+    navigator.clipboard.writeText(item.cursor_prompt);
+    showToast('✅ Промпт скопирован');
+  }
+
+  async function synthesizeNews(idx) {
+    const item = cachedNews[idx];
+    if (!item) return;
+    showToast('Готовим статьи и лид-магнит по новости: ' + item.title.slice(0, 30) + '...');
+    try {
+      const res = await fetch('/api/horizon/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ news_item: item })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Кампания создана: статьи и лид-магнит готовы (' + data.result.lead_magnet_preset + ')');
+        loadLeadMagnets();
+      } else {
+        showToast('❌ Не удалось создать кампанию: ' + data.error);
+      }
+    } catch (e) {
+      showToast('❌ Ошибка соединения');
+    }
+  }
+
+  async function loadLeadMagnets() {
+    const listEl = document.getElementById('lmLibraryList');
+    try {
+      const res = await fetch('/api/lead-magnet/list');
+      const data = await res.json();
+      const magnets = data.magnets || [];
+      if (magnets.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px;">Файлов пока нет. Создайте первый лид-магнит выше.</div>';
+        return;
+      }
+      let html = '';
+      magnets.forEach(m => {
+        html += `
+          <div class="lm-item">
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 3px;">📄 ${esc(m.name)}</div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">${esc(m.filename)} • ${esc(m.size_kb)} KB</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <a class="btn btn-sm btn-outline" href="${esc(safeUrl(m.url))}" download>📥 Скачать PDF</a>
+            </div>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('lmGenForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const preset = document.getElementById('lmPreset').value;
+    const custom = document.getElementById('lmCustomTopic').value.trim();
+    const topic = (preset === 'custom') ? custom : preset;
+
+    if (preset === 'custom' && !custom) {
+      showToast('⚠️ Введите название темы для лид-магнита');
+      return;
+    }
+
+    const btn = document.getElementById('genLmBtn');
+    btn.disabled = true;
+    btn.innerText = '⏳ Собираем PDF…';
+    showToast('Генерация лид-магнита (Markdown + PDF)...');
+
+    try {
+      const res = await fetch('/api/lead-magnet/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Лид-магнит готов: ' + data.title.slice(0, 35) + '... (' + data.size_kb + ' KB)');
+        loadLeadMagnets();
+      } else {
+        showToast('❌ Ошибка генерации: ' + data.error);
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сети при генерации');
+    } finally {
+      btn.disabled = false;
+      btn.innerText = '🚀 Создать PDF и Markdown';
+    }
+  });
+
+  async function loadSessionsStatus() {
+    try {
+      const res = await fetch('/api/sessions/status');
+      const data = await res.json();
+      const plats = data.platforms || {};
+
+      ['vc', 'spark', 'dzen', 'executive'].forEach(p => {
+        const badge = document.getElementById(p + 'StatusBadge');
+        if (plats[p] && plats[p].has_cookies) {
+          badge.className = 'score-badge score-high';
+          badge.innerText = '🟢 Сессия сохранена';
+        } else {
+          badge.className = 'score-badge';
+          badge.innerText = '🔴 Требуются куки';
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function saveSession(platform) {
+    const input = document.getElementById(platform + 'Cookies');
+    const cookies = input.value.trim();
+    if (!cookies) {
+      showToast('⚠️ Вставьте куки перед сохранением');
+      return;
+    }
+    showToast('Проверяем вход на ' + platform.toUpperCase() + '...');
+    try {
+      const res = await fetch('/api/sessions/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, cookies })
+      });
+      const data = await res.json();
+      if (data.authorized) {
+        showToast('✅ ' + data.message);
+        loadSessionsStatus();
+      } else {
+        showToast('⚠️ Статус: ' + (data.message || 'Ошибка валидации'));
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сохранения сессии');
+    }
+  }
+
+  async function verifyBotToken() {
+    const tokenInput = document.getElementById('oppBotToken');
+    const token = tokenInput.value.trim();
+    if (!token && !tokenInput.disabled) {
+      showToast('⚠️ Введите токен бота перед проверкой');
+      return;
+    }
+    showToast('Проверка токена в Telegram API...');
+    try {
+      const res = await fetch('/api/check-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('✅ Токен рабочий. Бот: @' + data.result.username + ' (' + data.result.first_name + ')');
+      } else {
+        showToast('❌ Ошибка токена: ' + (data.description || 'Неверный токен'));
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сети при проверке токена');
+    }
+  }
+
+  document.getElementById('secretsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+    // A secret is applied by the server only with its explicit change flag
+    e.target.querySelectorAll('input[data-secret]').forEach(el => {
+      if (!el.disabled && el.value.trim()) payload['__set__' + el.name] = '1';
+    });
+
+    showToast('Сохраняем и перезапускаем бота…');
+    try {
+      const res = await fetch('/api/secrets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Сохранено, бот перезапущен');
+        lockSecrets();
+        setTimeout(reloadStatus, 1500);
+      } else {
+        showToast('❌ Ошибка: ' + (data.error || 'Ошибка сохранения'));
+      }
+    } catch (e) {
+      showToast('❌ Ошибка сохранения');
+    }
+  });
+
+  // --- CONVERSION & CONTENT ANALYTICS ---
+  let cachedAnalytics = null;
+
+  async function loadAnalytics() {
+    const timeEl = document.getElementById('analyticsLastUpdated');
+    if (timeEl) timeEl.innerText = 'Загрузка...';
+
+    try {
+      const res = await fetch('/api/analytics');
+      if (res.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+      const data = await res.json();
+      if (!data.success) {
+        if (timeEl) timeEl.innerText = 'Ошибка загрузки';
+        return;
+      }
+      cachedAnalytics = data;
+      renderAnalytics(data);
+      if (timeEl) {
+        const now = new Date();
+        timeEl.innerText = 'Обновлено в ' + now.toLocaleTimeString();
+      }
+    } catch (e) {
+      if (timeEl) timeEl.innerText = 'Сбой сети';
+    }
+  }
+
+  function renderAnalytics(data) {
+    const s = data.summary || {};
+    const starts = s.unique_starts || 0;
+    const subs = s.unique_subscribers || 0;
+    const pdfs = s.unique_pdfs || 0;
+    const leads = s.unique_leads || 0;
+
+    document.getElementById('kpiStarts').innerText = starts;
+    document.getElementById('kpiSubs').innerText = subs;
+    document.getElementById('kpiPdfs').innerText = pdfs;
+    document.getElementById('kpiLeads').innerText = leads;
+
+    document.getElementById('badgeCrSub').innerText = 'CR: ' + (s.cr_sub || 0) + '%';
+    document.getElementById('badgeCrPdf').innerText = 'CR: ' + (s.cr_pdf || 0) + '%';
+    document.getElementById('badgeCrLead').innerText = 'CR: ' + (s.cr_lead || 0) + '%';
+
+    // Render Sample Size Card
+    const sampleProgress = s.sample_progress || 0;
+    const sampleStatus = s.sample_status || ('Калибровка (' + starts + '/50 мин.)');
+    const sampleDesc = s.sample_description || 'Решения принимаются по объёму выборки (50–100 переходов), а не по календарным датам.';
+    const sampleColor = s.sample_color || '#f59e0b';
+
+    const countEl = document.getElementById('sampleCountDisplay');
+    if (countEl) countEl.innerText = starts;
+
+    const barEl = document.getElementById('sampleProgressBar');
+    if (barEl) barEl.style.width = Math.min(100, sampleProgress) + '%';
+
+    const badgeEl = document.getElementById('sampleStatusBadge');
+    if (badgeEl) {
+      badgeEl.innerText = sampleStatus;
+      badgeEl.style.color = sampleColor;
+      badgeEl.style.background = sampleColor === '#10b981' ? 'rgba(16, 185, 129, 0.2)' : 
+                                 (sampleColor === '#3b82f6' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)');
+    }
+
+    const descEl = document.getElementById('sampleDescText');
+    if (descEl) descEl.innerText = sampleDesc;
+
+    // Render Funnel Visual
+    const funnelContainer = document.getElementById('funnelVisualContainer');
+
+    const pctSubs = starts > 0 ? Math.round((subs / starts) * 100) : 0;
+    const pctPdfs = starts > 0 ? Math.round((pdfs / starts) * 100) : 0;
+    const pctLeads = starts > 0 ? Math.round((leads / starts) * 100) : 0;
+
+    funnelContainer.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">1. Клик по ссылке из поста / статьи</span>
+            <strong>${esc(starts)} чел. (100%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: 100%; background: #38bdf8; border-radius: 5px;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">2. Подписка на канал {{ channel }}</span>
+            <strong>${esc(subs)} чел. (${pctSubs}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctSubs}%; background: #10b981; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">3. Получили материал</span>
+            <strong>${esc(pdfs)} чел. (${pctPdfs}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctPdfs}%; background: #818cf8; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px;">
+            <span style="font-weight: 600;">4. Коммерческое обращение</span>
+            <strong>${esc(leads)} чел. (${pctLeads}%)</strong>
+          </div>
+          <div style="height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: ${pctLeads}%; background: #f59e0b; border-radius: 5px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Render Strategy Recommendations
+    const recsContainer = document.getElementById('strategyRecsContainer');
+    const recs = data.recommendations || [];
+    if (recs.length === 0) {
+      recsContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">Данных пока мало: нужны переходы по ссылкам на бота.</div>';
+    } else {
+      recsContainer.innerHTML = recs.map(r => {
+        const borderCol = r.priority === 'high' ? '#38bdf8' : '#64748b';
+        const icon = r.priority === 'high' ? '🎯' : '💡';
+        return `
+          <div style="background: rgba(18, 26, 45, 0.85); border-left: 3px solid ${borderCol}; padding: 12px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <div style="font-weight: 700; font-size: 13.5px; color: #f8fafc; margin-bottom: 4px;">${icon} ${esc(r.title)}</div>
+            <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.45;">${esc(r.text)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Topic Breakdown
+    const tbody = document.getElementById('topicBreakdownTbody');
+    const breakdown = data.breakdown || [];
+    if (breakdown.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Переходов по темам пока не зафиксировано</td></tr>';
+    } else {
+      tbody.innerHTML = breakdown.map(b => {
+        let badge = '';
+        if (b.efficiency === 'high') {
+          badge = '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">🔥 Лидер</span>';
+        } else if (b.efficiency === 'medium') {
+          badge = '<span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">⚡️ Средняя</span>';
+        } else {
+          badge = '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">⚠️ Доработка</span>';
+        }
+
+        return `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <td style="padding: 10px;">
+              <div style="font-weight: 600; color: #f1f5f9;">${esc(b.topic_name)}</div>
+              <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">start=${esc(b.slug)}</div>
+            </td>
+            <td style="padding: 10px; text-align: center; font-weight: 700;">${esc(b.starts)}</td>
+            <td style="padding: 10px; text-align: center; color: #10b981;">${esc(b.subs)}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 600;">${esc(b.cr_sub)}%</td>
+            <td style="padding: 10px; text-align: center; color: #818cf8;">${esc(b.pdfs)}</td>
+            <td style="padding: 10px; text-align: center; color: #f59e0b; font-weight: 700;">${esc(b.leads)}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 600;">${esc(b.cr_lead)}%</td>
+            <td style="padding: 10px; text-align: right;">${badge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Render Recent Events
+    const eventsTbody = document.getElementById('liveEventsTbody');
+    const events = data.recent_events || [];
+    document.getElementById('eventsCountBadge').innerText = events.length + ' событий';
+    if (events.length === 0) {
+      eventsTbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Событий пока нет. Они появятся, когда люди начнут переходить в бота.</td></tr>';
+    } else {
+      eventsTbody.innerHTML = events.map(ev => {
+        let evBadge = '';
+        if (ev.event_type === 'start') {
+          evBadge = '<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">Вход /start</span>';
+        } else if (ev.event_type === 'subscribed') {
+          evBadge = '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Подписка</span>';
+        } else if (ev.event_type === 'pdf_delivered') {
+          evBadge = '<span class="badge" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">Выдан PDF</span>';
+        } else if (ev.event_type === 'tier_click') {
+          evBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">Заявка</span>';
+        } else {
+          evBadge = '<span class="badge" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8;">' + esc(ev.event_type) + '</span>';
+        }
+
+        const userDisplay = ev.username ? '@' + ev.username : (ev.first_name || 'ID: ' + ev.user_id);
+        const timeFormatted = ev.created_at ? ev.created_at.replace('T', ' ').slice(0, 19) : '';
+
+        return `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <td style="padding: 8px 10px; color: var(--text-muted); font-size: 11.5px; white-space: nowrap;">${esc(timeFormatted)}</td>
+            <td style="padding: 8px 10px; font-weight: 600; color: #f1f5f9;">${esc(userDisplay)}</td>
+            <td style="padding: 8px 10px;">${evBadge}</td>
+            <td style="padding: 8px 10px; font-family: monospace; font-size: 11.5px; color: #38bdf8;">${esc(ev.slug || 'general')}</td>
+            <td style="padding: 8px 10px; color: var(--text-muted); font-size: 11.5px;">${esc(ev.details)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // Initial status load
+  reloadStatus();
+  loadArticles();
+</script>
+
+</body>
+</html>

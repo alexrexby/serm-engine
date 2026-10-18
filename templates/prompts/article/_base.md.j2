@@ -1,0 +1,12 @@
+{#- Article task, extended by prompts/article/<platform>.md.j2 (block `format`).
+    Context: profile, brand, seo, news, platform {key, name, url, type, min_chars, max_chars, target_chars, allow_markdown}. -#}
+{% include "prompts/partials/context.md.j2" %}
+Задача: напиши статью для площадки {{ platform.name }} ({{ platform.url }}).
+{% block format %}{% endblock %}
+Объём основного текста (поле body_markdown, без заголовка и лида): не меньше {{ platform.min_chars }} знаков{% if platform.max_chars %} и не больше {{ platform.max_chars }}{% endif %}, ориентир — около {{ platform.target_chars }} знаков.
+Структура body_markdown: 4–7 разделов с подзаголовками «## », абзацы, списки там, где они помогают. Заголовок статьи («# ») в body_markdown не повторяй.
+{% if not platform.allow_markdown -%}
+Площадка не поддерживает сложную разметку: только подзаголовки «## », абзацы и простые списки, без таблиц и цитат.
+{% endif %}
+Ответ — JSON:
+{"title": "заголовок статьи", "lead": "одно-два предложения: зачем читать", "body_markdown": "основной текст в markdown", "tags": ["от 3 до 7 тегов"]}

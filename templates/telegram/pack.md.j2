@@ -1,0 +1,17 @@
+{#- Файл пакета постов data/exports/campaign_<id>/telegram_content_pack.md.
+    brand — бренд кампании (или display_name профиля); posts — [{id, title, content}] из telegram/posts.yaml.j2. -#}
+# Пакет публикаций для Telegram-канала ({{ brand }})
+
+> Посты для канала — публикуйте по порядку. В анонс статьи перед публикацией вставьте ссылку на неё.
+
+---
+
+{% for post in posts %}{% if not loop.first %}
+{% endif %}## {{ post.title }}
+
+```text
+{{ post.content }}
+```
+
+---
+{% endfor -%}

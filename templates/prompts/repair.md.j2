@@ -1,0 +1,16 @@
+{#- Repair request after a failed post-check. Context: issues [{code, ...}] from core/llm_generation.py. -#}
+Ответ не прошёл проверку:
+{% for issue in issues -%}
+{% if issue.code == "too_short" -%}
+- основной текст короче минимума: {{ issue.actual }} знаков, нужно не меньше {{ issue.min }}. Допиши содержательные разделы.
+{% elif issue.code == "too_long" -%}
+- основной текст длиннее максимума: {{ issue.actual }} знаков, нужно не больше {{ issue.max }}. Сократи.
+{% elif issue.code == "forbidden" -%}
+- найдены запрещённые слова или темы: {{ issue.words | join(", ") }}. Убери их полностью.
+{% elif issue.code == "bad_json" -%}
+- ответ не является JSON нужного формата ({{ issue.detail }}).
+{% else -%}
+- {{ issue.code }}
+{% endif -%}
+{% endfor %}
+Исправь и пришли ответ целиком заново, в том же JSON-формате.

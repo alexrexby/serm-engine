@@ -1,0 +1,7 @@
+{#- Пост 3: форматы работы (profile.offer_tiers). -#}
+🧭 **Форматы работы — {{ profile.display_name }}**
+
+{% for tier in profile.offer_tiers %}{{ loop.index }}. **{{ tier.title }}**{% if tier.text %} — {{ tier.text }}{% endif %}{% if tier.url %}
+👉 [{{ tier.cta or tier.title }}]({{ tier.url }}){% endif %}
+{% endfor %}
+Не уверены, что подойдёт? Напишите {{ profile.telegram.contact }} и коротко опишите задачу: вместе выберем, с чего начать.

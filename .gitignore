@@ -1,0 +1,30 @@
+# Секреты и окружение
+.env
+.env.*
+!.env.example
+
+# Рабочие данные установки: БД, cookie-сессии площадок, выгрузки, скриншоты
+data/
+
+# Профили: в git только примеры; профиль владельца и его override-шаблоны — локально
+profiles/*.yaml
+!profiles/example*.yaml
+profiles/*/
+!profiles/example*/
+
+# Локальные скрипты и маркеры владельца (деплой, приёмка нейтральности)
+.local/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.bak
+*.bak2
+
+# Вендорный репозиторий (решение о submodule — в плане)
+horizon/
+
+# IDE / агенты
+.agents/
+.DS_Store

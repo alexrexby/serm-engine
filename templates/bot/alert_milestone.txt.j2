@@ -1,0 +1,3 @@
+{#- Plain text for send_telegram_alert. Context: starts, admin_url (PUBLIC_ADMIN_URL; empty → no link,
+    the access token is never put into the link). -#}
+Порог выборки ({{ starts }}) достигнут. Изучите конверсии в панели управления{% if admin_url %}: {{ admin_url }}{% else %}.{% endif %}

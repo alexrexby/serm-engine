@@ -1,0 +1,9 @@
+{#- Пост 1: принципы бренда (profile.voice.theses). -#}
+💡 **{{ profile.voice.theses[0] if profile.voice.theses else profile.seo.seed_topic }}**
+
+{% if profile.voice.theses %}{{ v.my_pl|capitalize }} принципы в работе:
+{% for thesis in profile.voice.theses %}— {{ thesis }}
+{% endfor %}{% endif %}
+Если такой подход вам близок — дальше в канале разборы, как применять его на практике.
+
+{% include "telegram/posts/_magnet_cta.md.j2" %}

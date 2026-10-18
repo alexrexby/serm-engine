@@ -1,0 +1,15 @@
+{#- Llm-written checklist → lead_magnet_<slug>.md. Context: profile, magnet, draft {title, sections [{heading, items}]}, brand.
+    Offer and contacts come from partials/offer.md.j2, never from the model. -#}
+# {{ draft.title }}
+
+{% if magnet.desc %}{{ magnet.desc }}
+
+{% endif -%}
+{% for section in draft.sections %}## {{ loop.index }}. {{ section.heading }}
+
+{% for item in section["items"] %}- [ ] {{ item }}
+{% endfor %}
+{% endfor -%}
+---
+
+{% include "partials/offer.md.j2" %}

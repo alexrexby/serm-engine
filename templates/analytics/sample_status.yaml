@@ -1,0 +1,11 @@
+# Статус статистической выборки (админка: вкладка аналитики). YAML; строковые значения — шаблоны Jinja,
+# рендер после разбора. Контекст всех строк: profile, starts, sample_min, sample_target.
+calibrating:   # starts < sample_min
+  status: "Калибровка ({{ starts }}/{{ sample_min }} мин.)"
+  description: "Накопление базовой выборки. До минимального порога осталось {{ sample_min - starts }} переходов. Принимать решения по контент-плану пока рано."
+emerging:      # sample_min <= starts < sample_target
+  status: "Первичный тренд ({{ starts }}/{{ sample_target }})"
+  description: "Минимальный порог в {{ sample_min }} переходов пройден. Проявляются первые лидеры. Добираем ещё {{ sample_target - starts }} переходов до полной достоверности."
+significant:   # starts >= sample_target
+  status: "Выборка подтверждена ({{ starts }}/{{ sample_target }}+)"
+  description: "Статистическая мощность выборки достаточна. Разница между темами математически достоверна — масштабируйте тему-победителя."

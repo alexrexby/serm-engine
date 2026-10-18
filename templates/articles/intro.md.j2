@@ -1,0 +1,4 @@
+{#- Article lead, one line (wrapped in *...* in markdown). Context: profile, v, brand, seed_topic. -#}
+{%- set theses = profile.voice.theses -%}
+{{ brand }} — о теме «{{ seed_topic }}»: коротко и по делу.
+{%- if theses %} {{ v.my_pl|capitalize }} принципы: {{ theses|join("; ") }}.{% endif -%}
