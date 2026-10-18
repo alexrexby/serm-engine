@@ -129,6 +129,10 @@ def _buttons(profile: Any, channel_username: str, contact_username: Optional[str
             "lead": entry.get("lead", True),
             # magnet: the button sends the lead magnet PDF in the bot (hidden right after a PDF was sent)
             "magnet": bool(entry.get("magnet", False)),
+            # hidden: not in new menus, but buttons of menus already sent keep working
+            "hidden": bool(entry.get("hidden", False)),
+            # interest: what the owner's lead alert names (default: the offer tier title)
+            "interest": entry.get("interest"),
             "tier": tier,
         })
     data["funnel"] = funnel
@@ -154,7 +158,7 @@ def get_funnel_keyboard(profile: Optional[Any] = None, channel_username: Optiona
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=entry["button"], callback_data=f"tier_{entry['id']}")]
         for entry in buttons["funnel"]
-        if not (after_magnet and entry["magnet"])
+        if not entry["hidden"] and not (after_magnet and entry["magnet"])
     ])
 
 
@@ -433,7 +437,7 @@ def create_opp_dispatcher(channel_username: str, exports_dir: Optional[Path], co
             try:
                 _alert(profile, "lead", render(
                     "bot/alert_lead.txt.j2", profile, username=user.username, first_name=user.first_name,
-                    user_id=user.id, interest=tier.title if tier else tier_id, slug=slug))
+                    user_id=user.id, interest=entry["interest"] or (tier.title if tier else tier_id), slug=slug))
             except Exception:
                 # The lead alert is the owner's money signal: never lose it silently
                 logger.exception(f"Bot lead alert failed (tier_{tier_id}, user {user.id})")

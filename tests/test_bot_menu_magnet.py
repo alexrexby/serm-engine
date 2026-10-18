@@ -96,3 +96,26 @@ def test_magnet_button_requires_subscription(profile, alerts, monkeypatch, tmp_p
     calls = _run(profile, [_callback(5401, f"tier_{marked['id']}")], subscribed=(), exports_dir=_pdf(profile, tmp_path))
     assert [n for n, _ in calls] == ["AnswerCallbackQuery"] and calls[0][1].show_alert
     assert not logged
+
+
+def test_hidden_entry_keeps_old_buttons_working_and_interest_names_the_alert(profile, alerts, monkeypatch):
+    real = opp_bot._buttons
+
+    def buttons(*a, **kw):
+        data = real(*a, **kw)
+        data["funnel"][0]["hidden"] = True
+        data["funnel"][1]["interest"] = "Бесплатная диагностика"
+        return data
+
+    monkeypatch.setattr(opp_bot, "_buttons", buttons)
+    funnel = buttons(profile, profile.telegram.channel)["funnel"]
+    keyboard = opp_bot.get_funnel_keyboard(profile)
+    ids = [row[0].callback_data for row in keyboard.inline_keyboard]
+    assert f"tier_{funnel[0]['id']}" not in ids and f"tier_{funnel[1]['id']}" in ids
+
+    calls = _run(profile, [_callback(5501, f"tier_{funnel[0]['id']}")])  # a button of an old menu
+    assert calls[-1][0] == "SendMessage" and calls[-1][1].reply_markup  # still answers
+
+    alerts.clear()
+    _run(profile, [_callback(5502, f"tier_{funnel[1]['id']}")])
+    assert len(alerts) == 1 and "Интерес: Бесплатная диагностика" in alerts[0]["error_message"]
