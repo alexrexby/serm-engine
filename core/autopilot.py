@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 
 from core.db import Database
 from core.models import Article
-from core.indexer import FastIndexer
+from core.indexer import FastIndexer, indexable_url
 from core.telegram_posts import load_posts
 from config.settings import DATA_DIR, EXPORTS_DIR, get_bot_token, load_settings
 from core.profile import DAYS, SLOT_WINDOW_MINUTES
@@ -218,9 +218,20 @@ class AutopilotEngine:
             state.setdefault("published_history", []).append(history_item)
             # saved before pinging: a failing indexer must not make the published article look unpublished
             AutopilotState.save(state)
-            if res.published_url:
+            public_url = indexable_url(res)
+            if public_url:
                 indexer = FastIndexer()
-                await asyncio.to_thread(indexer.ping_all, target_article.id, target_article.title, res.published_url)
+                await asyncio.to_thread(indexer.ping_all, target_article.id, target_article.title, public_url)
+            elif res.status != "published" and PLATFORMS[target_article.platform].type != "editorial_pitch":
+                # a pitch package is the normal outcome of an editorial platform, a draft is a failed auto-publish
+                # the publisher may be unsure (Dzen: status not confirmed in time) — never tell to publish blindly
+                details = f"Публикация не подтверждена: {target_article.title} → {res.published_url or 'адрес не получен'}. Проверьте и при необходимости опубликуйте вручную"
+                await send_telegram_alert(
+                    title=f"Статья на {target_article.platform} не опубликована",
+                    error_message=f"{details}\n{res.message}" if res.message else details,
+                    context=f"Статус: {res.status}",
+                    level="warning"
+                )
             logger.info(f"Autopilot: Successfully processed [{target_article.platform}] -> {res.status}")
             return history_item
 

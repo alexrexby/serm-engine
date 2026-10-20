@@ -31,7 +31,7 @@ from aiohttp import web, ClientSession
 from config.settings import DATA_DIR, EXPORTS_DIR, SESSIONS_DIR, BASE_DIR, ENV_FILE, PLATFORMS_CONFIG, load_settings
 from core import content, envfile
 from core.db import Database
-from core.indexer import FastIndexer
+from core.indexer import FastIndexer, indexable_url
 from core.horizon_connector import HorizonConnector
 from core.profile import get_profile
 from core.session_manager import SessionManager
@@ -55,12 +55,35 @@ LEAD_FIELDS = ("id", "user_id", "username", "first_name", "slug", "status", "cre
                "product", "amount")
 # Bot restarts after saving secrets: the loop keeps only a weak reference to a task
 _RESTART_TASKS: set = set()
+# Indexer pings after a single-article publish run in the background: same weak-reference rule
+_INDEX_TASKS: set = set()
 
 
 def _restart_done(task: asyncio.Task) -> None:
     _RESTART_TASKS.discard(task)
     if not task.cancelled() and task.exception() is not None:
         logger.error("Bot restart after saving secrets failed", exc_info=task.exception())
+
+
+def _index_done(task: asyncio.Task) -> None:
+    _INDEX_TASKS.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        logger.error("Indexer ping after publishing failed", exc_info=task.exception())
+
+
+def republish_error(article) -> Optional[str]:
+    """Why an article must not be published from the admin, or None. Each publish creates a new copy on the
+    platform: an article already there (published or left as a draft) would get a duplicate.
+    An editorial pitch is a local package, so it may be prepared again."""
+    spec = PLATFORMS.get(article.platform)
+    if article.status in ("ready", "failed") or (spec is not None and spec.type == "editorial_pitch"):
+        return None
+    if article.status == "published":
+        return f"Статья уже опубликована: {article.published_url or 'адрес не сохранён'}"
+    if article.status == "draft_saved":
+        return (f"Статья уже лежит на площадке черновиком: {article.published_url or 'адрес не сохранён'} — "
+                "допубликуйте её в кабинете площадки, повторная публикация создаст дубль")
+    return f"Статья в статусе «{article.status}»: публикуются только статьи в статусе ready или failed"
 
 
 def get_or_create_admin_token() -> str:
@@ -658,6 +681,9 @@ class AdminController:
             return web.json_response({"success": False, "error": "Статья не найдена"}, status=404)
         if article.status == "draft":
             return web.json_response({"success": False, "error": "Черновик: сначала одобрите статью"}, status=409)
+        blocked = republish_error(article)
+        if blocked:
+            return web.json_response({"success": False, "error": blocked}, status=409)
 
         try:
             publisher = get_publisher(article.platform)
@@ -670,11 +696,14 @@ class AdminController:
                     status=result.status,
                     published_url=result.published_url
                 )
-                if result.published_url:
+                public_url = indexable_url(result)
+                if public_url:
                     indexer = FastIndexer()
-                    asyncio.create_task(asyncio.to_thread(
-                        indexer.ping_all, article.id, article.title, result.published_url
+                    task = asyncio.create_task(asyncio.to_thread(
+                        indexer.ping_all, article.id, article.title, public_url
                     ))
+                    _INDEX_TASKS.add(task)
+                    task.add_done_callback(_index_done)
 
                 return web.json_response({
                     "success": True,
@@ -716,6 +745,10 @@ class AdminController:
 
         results = []
         for plat, article in target_articles.items():
+            blocked = republish_error(article)
+            if blocked:
+                results.append({"platform": plat, "success": False, "status": article.status, "error": blocked})
+                continue
             try:
                 publisher = get_publisher(plat)
                 res = await asyncio.to_thread(publisher.publish, article)
@@ -725,9 +758,10 @@ class AdminController:
                         status=res.status,
                         published_url=res.published_url
                     )
-                    if res.published_url:
+                    public_url = indexable_url(res)
+                    if public_url:
                         indexer = FastIndexer()
-                        await asyncio.to_thread(indexer.ping_all, article.id, article.title, res.published_url)
+                        await asyncio.to_thread(indexer.ping_all, article.id, article.title, public_url)
                 else:
                     db.update_article_status(article_id=article.id, status="failed", error_message=res.error)
 

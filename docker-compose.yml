@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: serm-daemon
     restart: unless-stopped
+    # tini as PID 1 reaps exited headless Chromium processes (prod 2026-10-19: 18 zombies in ~21h)
+    init: true
     ports:
       # Admin panel is published on localhost only by default; set ADMIN_BIND=0.0.0.0
       # in .env to expose it (e.g. for the browser extension to sync cookies)

@@ -5,6 +5,7 @@ Automates draft creation and submission for moderation via Playwright persistent
 import time
 from core.models import Article, PublishResult
 from publishers.base import BasePublisher
+from publishers.browser import open_context
 from config.settings import PLATFORMS_CONFIG
 
 class ExecutivePublisher(BasePublisher):
@@ -59,71 +60,61 @@ class ExecutivePublisher(BasePublisher):
             )
 
         try:
-            launch_args = ["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"]
-            launch_kwargs = {
-                "user_data_dir": str(self.session_dir),
-                "headless": True,
-                "args": launch_args
-            }
-            storage_file = self.session_dir / "storage_state.json"
-            if storage_file.exists() and storage_file.stat().st_size > 50:
-                launch_kwargs["storage_state"] = str(storage_file)
-
             with sync_playwright() as p:
-                context = p.chromium.launch_persistent_context(**launch_kwargs)
-                page = context.new_page()
-                page.goto("https://www.e-xecutive.ru/my/articles/new", timeout=30000)
-                time.sleep(3)
+                browser, context = open_context(p, self.session_dir)
+                try:
+                    page = context.new_page()
+                    page.goto("https://www.e-xecutive.ru/my/articles/new", timeout=30000)
+                    time.sleep(3)
 
-                # Check if editor is reachable
-                if "login" in page.url:
-                    context.close()
-                    return PublishResult(
-                        success=False,
-                        platform="executive",
-                        article_id=article.id,
-                        error="Сессия устарела. Запустите 'serm login --platform executive'"
-                    )
+                    # Check if editor is reachable
+                    if "login" in page.url:
+                        return PublishResult(
+                            success=False,
+                            platform="executive",
+                            article_id=article.id,
+                            error="Сессия устарела. Запустите 'serm login --platform executive'"
+                        )
 
-                # Title (up to 70 chars per editorial rules)
-                title_val = article.title[:70]
-                page.fill("input[name*='title'], #article_title", title_val)
+                    # Title (up to 70 chars per editorial rules)
+                    title_val = article.title[:70]
+                    page.fill("input[name*='title'], #article_title", title_val)
 
-                # Lead (up to 160 chars per editorial rules)
-                lead_val = (article.lead or "")[:160]
-                if page.is_visible("textarea[name*='annotation'], #article_annotation"):
-                    page.fill("textarea[name*='annotation'], #article_annotation", lead_val)
+                    # Lead (up to 160 chars per editorial rules)
+                    lead_val = (article.lead or "")[:160]
+                    if page.is_visible("textarea[name*='annotation'], #article_annotation"):
+                        page.fill("textarea[name*='annotation'], #article_annotation", lead_val)
 
-                # Body content
-                body_elem = page.locator("textarea[name*='body'], .redactor-editor, [contenteditable='true']")
-                if body_elem.count() > 0:
-                    body_elem.first.fill(article.content_markdown)
+                    # Body content
+                    body_elem = page.locator("textarea[name*='body'], .redactor-editor, [contenteditable='true']")
+                    if body_elem.count() > 0:
+                        body_elem.first.fill(article.content_markdown)
 
-                time.sleep(2)
+                    time.sleep(2)
 
-                # Save draft
-                save_btn = page.locator("button:has-text('Сохранить'), input[value*='Сохранить']")
-                if save_btn.count() > 0:
-                    save_btn.first.click()
-                    time.sleep(4)
+                    # Save draft
+                    save_btn = page.locator("button:has-text('Сохранить'), input[value*='Сохранить']")
+                    if save_btn.count() > 0:
+                        save_btn.first.click()
+                        time.sleep(4)
 
-                    context.close()
-                    return PublishResult(
-                        success=True,
-                        platform="executive",
-                        article_id=article.id,
-                        status="submitted",
-                        message="Материал сохранен в ЛК E-xecutive и готов к отправке в редакцию (срок проверки ~10 раб. дней)"
-                    )
-                else:
-                    context.close()
-                    return PublishResult(
-                        success=True,
-                        platform="executive",
-                        article_id=article.id,
-                        status="draft_saved",
-                        message="Черновик сохранен на E-xecutive.ru"
-                    )
+                        return PublishResult(
+                            success=True,
+                            platform="executive",
+                            article_id=article.id,
+                            status="submitted",
+                            message="Материал сохранен в ЛК E-xecutive и готов к отправке в редакцию (срок проверки ~10 раб. дней)"
+                        )
+                    else:
+                        return PublishResult(
+                            success=True,
+                            platform="executive",
+                            article_id=article.id,
+                            status="draft_saved",
+                            message="Черновик сохранен на E-xecutive.ru"
+                        )
+                finally:
+                    browser.close()
         except Exception as e:
             return PublishResult(
                 success=False,

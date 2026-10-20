@@ -103,3 +103,72 @@ def test_draft_is_not_published(example_profile):
     assert single_status == 409
     assert all(r["platform"] != "dzen" for r in bulk["results"])
     assert db.get_article("draft-2").status == "draft"
+
+
+@pytest.mark.parametrize("status, url, pinged", [
+    ("draft_saved", "https://vc.ru/drafts", False),
+    ("published", "https://vc.ru/u/1-x/123-t", True),  # positive control: the observation sees a ping
+])
+def test_only_published_article_is_indexed(example_profile, monkeypatch, status, url, pinged):
+    from core.models import PublishResult
+    db = Database()
+    campaign = f"index-{status}"
+    # separate articles: after the single publish its article is no longer publishable from the admin
+    for article_id, campaign_id in ((f"idx-{status}", f"single-{status}"), (f"idx-bulk-{status}", campaign)):
+        db.add_article(Article(id=article_id, campaign_id=campaign_id, platform="vc", title="T", lead="L",
+                               content_markdown="body", content_html="<p>body</p>", tags="", status="ready"))
+
+    class FakePublisher:
+        def publish(self, article):
+            return PublishResult(success=True, platform="vc", article_id=article.id, published_url=url, status=status)
+
+    pings = []
+    monkeypatch.setattr(admin, "get_publisher", lambda platform: FakePublisher())
+    monkeypatch.setattr(admin, "FastIndexer", lambda: type("I", (), {"ping_all": lambda self, *a: pings.append(a)})())
+
+    async def flow(client):
+        h = {"X-Admin-Token": TOKEN}
+        single = await client.post("/api/publish/article", json={"article_id": f"idx-{status}"}, headers=h)
+        await asyncio.sleep(0.2)  # the single-article ping runs as a background task
+        bulk = await client.post("/api/publish/campaign", json={"campaign_id": campaign}, headers=h)
+        return single.status, bulk.status
+
+    assert _run(flow) == (200, 200)
+    assert pings == ([(f"idx-{status}", "T", url), (f"idx-bulk-{status}", "T", url)] if pinged else [])
+
+
+@pytest.mark.parametrize("status, phrase", [
+    ("published", "уже опубликована"),
+    ("draft_saved", "допубликуйте её в кабинете площадки"),
+])
+def test_article_already_on_platform_is_not_republished(example_profile, monkeypatch, status, phrase):
+    # Republishing creates a second copy on the platform (Dzen: a public duplicate)
+    db = Database()
+    campaign = f"again-{status}"
+    db.add_article(Article(id=f"again-{status}", campaign_id=campaign, platform="vc", title="T", lead="L",
+                           content_markdown="body", content_html="<p>body</p>", tags="", status=status,
+                           published_url="https://vc.ru/x"))
+    calls = []
+    monkeypatch.setattr(admin, "get_publisher", lambda platform: calls.append(platform))
+
+    async def flow(client):
+        h = {"X-Admin-Token": TOKEN}
+        single = await client.post("/api/publish/article", json={"article_id": f"again-{status}"}, headers=h)
+        bulk = await client.post("/api/publish/campaign", json={"campaign_id": campaign}, headers=h)
+        return single.status, await single.json(), await bulk.json()
+
+    single_status, single, bulk = _run(flow)
+    assert single_status == 409 and phrase in single["error"] and "https://vc.ru/x" in single["error"]
+    assert [(r["platform"], r["success"]) for r in bulk["results"]] == [("vc", False)]
+    assert phrase in bulk["results"][0]["error"]
+    assert calls == []
+    assert db.get_article(f"again-{status}").status == status
+
+
+@pytest.mark.parametrize("status", ["submitted", "exported"])
+def test_editorial_pitch_can_be_prepared_again(status):
+    # a pitch is a local package, nothing is created on the platform: no duplicate to guard against
+    article = Article(id="pitch-1", campaign_id="c", platform="tbank", title="T", lead="L", content_markdown="b",
+                      content_html="", tags="", status=status)
+    assert admin.republish_error(article) is None
+    assert admin.republish_error(Article(**{**article.__dict__, "platform": "vc"})) is not None

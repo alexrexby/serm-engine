@@ -239,3 +239,52 @@ def test_broken_posts_template_alerts_once_and_marks_slot(monkeypatch, tmp_path,
 
     assert len(isolated) == 1 and "posts.yaml.j2" in isolated[0]["context"]
     assert autopilot.AutopilotState.load()["last_tg_slot"] == "2026-01-05_mon_insight"
+
+
+@pytest.fixture
+def pings(monkeypatch):
+    calls = []
+    monkeypatch.setattr(autopilot, "FastIndexer", lambda: type("I", (), {"ping_all": lambda self, *a: calls.append(a)})())
+    return calls
+
+
+def _browser_result(monkeypatch, status, url):
+    class FakePublisher:
+        def publish(self, article):
+            return PublishResult(success=True, platform=article.platform, article_id=article.id,
+                                 published_url=url, status=status, message="Черновик сохранён в Дзен-студии")
+
+    monkeypatch.setattr(autopilot, "get_publisher", lambda platform: FakePublisher())
+    engine = autopilot.AutopilotEngine("camp1", profile=_profile(ALL_KEYS))
+    engine.db = FakeDb([_article("dzen")])
+    return engine
+
+
+def test_draft_alerts_owner_and_is_not_indexed(monkeypatch, isolated, pings):
+    edit_url = "https://dzen.ru/profile/editor/x/publications/123/edit"
+    engine = _browser_result(monkeypatch, "draft_saved", edit_url)
+    autopilot.AutopilotState.save({"article_failures": {"art-dzen-ready": 1}})  # a failed slot before
+
+    res = asyncio.run(engine.step_article_publication())
+
+    assert res["status"] == "draft_saved"
+    state = autopilot.AutopilotState.load()
+    assert state["article_failures"] == {}  # a draft is an outcome, not a failed slot
+    assert "dzen" in state["platform_attempts"]
+    assert engine.db.updates == [("art-dzen-ready", "draft_saved", {"published_url": edit_url})]
+    assert pings == []
+    assert len(isolated) == 1 and isolated[0]["level"] == "warning"
+    # the publisher may not know for sure (Dzen: status not confirmed in time): the alert must not say "publish"
+    assert "T dzen → " + edit_url in isolated[0]["error_message"]
+    assert "Проверьте и при необходимости опубликуйте вручную" in isolated[0]["error_message"]
+    assert "лежит черновиком" not in isolated[0]["error_message"]
+    assert "Черновик сохранён в Дзен-студии" in isolated[0]["error_message"]
+
+
+def test_published_is_indexed_without_alert(monkeypatch, isolated, pings):
+    engine = _browser_result(monkeypatch, "published", "https://dzen.ru/a/xyz")
+
+    asyncio.run(engine.step_article_publication())
+
+    assert pings == [("art-dzen-ready", "T dzen", "https://dzen.ru/a/xyz")]
+    assert isolated == []

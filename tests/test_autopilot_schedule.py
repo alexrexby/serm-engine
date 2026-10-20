@@ -138,7 +138,7 @@ def _engine(monkeypatch, profile, fired, clock, offset=3, publish_minutes=0):
         def publish(self, article):
             fired.append((local_label(), "article"))
             clock.utc += timedelta(minutes=publish_minutes)
-            return PublishResult(success=True, platform=article.platform, article_id=article.id, status="submitted")
+            return PublishResult(success=True, platform=article.platform, article_id=article.id, status="published")
 
     monkeypatch.setattr(autopilot, "get_publisher", lambda platform: FakePublisher())
     engine = autopilot.AutopilotEngine("camp1", profile=profile)
@@ -399,7 +399,7 @@ def test_success_after_failed_slot_clears_the_count(monkeypatch, tmp_path, clock
         def publish(self, article):
             ok = next(outcomes)
             return PublishResult(success=ok, platform=article.platform, article_id=article.id,
-                                 status="submitted" if ok else "failed", error=None if ok else "boom")
+                                 status="published" if ok else "failed", error=None if ok else "boom")
 
     alerts = []
 
@@ -416,7 +416,7 @@ def test_success_after_failed_slot_clears_the_count(monkeypatch, tmp_path, clock
 
     clock.run(engine, MONDAY, 2 * 24 * 60, interval=120)
 
-    assert engine.db.articles[0].status == "submitted"
+    assert engine.db.articles[0].status == "published"
     assert len(alerts) == 1
     assert autopilot.AutopilotState.load()["article_failures"] == {}
 

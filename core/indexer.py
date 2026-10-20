@@ -10,6 +10,12 @@ from typing import Dict, Any, Optional
 from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_INDEX_CHANNEL_ID, VK_API_ACCESS_TOKEN, VK_OWNER_ID
 from core.models import IndexingResult
 
+
+def indexable_url(result) -> Optional[str]:
+    """URL of a publish result to ping, or None: a draft's edit URL must never reach the indexer."""
+    return result.published_url if result.status == "published" and result.published_url else None
+
+
 class FastIndexer:
     def __init__(
         self,
