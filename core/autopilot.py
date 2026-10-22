@@ -14,6 +14,7 @@ import json
 import time
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone, timedelta
@@ -22,6 +23,14 @@ from core.db import Database
 from core.models import Article
 from core.indexer import FastIndexer, indexable_url
 from core.telegram_posts import load_posts
+
+# «[ссылка на статью]», «[Ссылка на публикацию на VC.ru / Дзене]»: text in brackets that is not a markdown link —
+# a fill-in left in a post template; such a post must never reach the channel (prod 2026-10-22)
+PLACEHOLDER_RE = re.compile(r"\[[^\]\n]*[^\W\d_][^\]\n]*\](?!\()")
+
+
+def unfilled_placeholders(text: str) -> List[str]:
+    return PLACEHOLDER_RE.findall(text or "")
 from config.settings import DATA_DIR, EXPORTS_DIR, get_bot_token, load_settings
 from core.profile import DAYS, SLOT_WINDOW_MINUTES
 from publishers.registry import PLATFORMS, enabled, get_publisher
@@ -294,10 +303,30 @@ class AutopilotEngine:
             logger.info("Autopilot: All Telegram template posts already delivered. Recycling queue.")
             idx = 0
 
+        # a post with an unfilled placeholder is skipped (one alert per skip); the next one goes in this slot
+        skipped = []
+        for _ in range(len(posts)):
+            found = unfilled_placeholders(posts[idx]["content"])
+            if not found:
+                break
+            skipped.append(f"«{posts[idx].get('title', posts[idx]['id'])}»: {', '.join(found)}")
+            idx = (idx + 1) % len(posts)
+        else:
+            idx = None
+        if skipped:
+            logger.warning(f"Autopilot: Telegram posts with unfilled placeholders skipped: {skipped}")
+            await send_telegram_alert(
+                title="Пост Telegram с незаполненной заглушкой — не отправлен",
+                error_message="; ".join(skipped) + " — заполните шаблон поста в профиле (telegram/posts)",
+                context=f"Канал: {channel}",
+                level="error"
+            )
+        if idx is None:
+            return {"error": "все посты Telegram содержат незаполненные заглушки", "skip_slot": True}
+
         post_data = posts[idx]
         text_content = post_data["content"].strip()
 
-        import re
         links = []
         def save_link(match):
             anchor = match.group(1)
@@ -307,6 +336,7 @@ class AutopilotEngine:
 
         text_html = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", save_link, text_content)
         text_html = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text_html)
+        text_html = re.sub(r"(?<![*\w])\*(?![\s*])(.+?)(?<![\s*])\*(?![*\w])", r"<i>\1</i>", text_html)
         for i, (anchor, url) in enumerate(links):
             text_html = text_html.replace(f"__LINK_{i}__", f'<a href="{url}">{anchor}</a>')
 

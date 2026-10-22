@@ -188,6 +188,78 @@ def test_failed_telegram_post_is_one_attempt_and_keeps_idx(monkeypatch, tmp_path
     assert len(isolated) == 1 and "chat not found" in isolated[0]["error_message"]
     assert autopilot.AutopilotState.load().get("next_tg_post_idx", 0) == 0
 
+class RecordingBot:
+    sent = []
+
+    def __init__(self, token):
+        self.session = self
+
+    async def send_message(self, **kwargs):
+        RecordingBot.sent.append(kwargs)
+
+    async def close(self):
+        pass
+
+
+def test_post_with_unfilled_placeholder_is_skipped_with_alert(monkeypatch, tmp_path, isolated):
+    # prod 2026-10-22: post 4 went to the channel with «[Ссылка на публикацию на VC.ru / Дзене]» instead of a link
+    import aiogram
+    RecordingBot.sent = []
+    monkeypatch.setattr(aiogram, "Bot", RecordingBot)
+    monkeypatch.setenv("OPP_BOT_TOKEN", "123456:" + "x" * 35)
+    engine = autopilot.AutopilotEngine(profile=_own_posts_profile(tmp_path, "example-company"))
+    posts = autopilot.load_posts(engine.profile)
+    placeholder = next(i for i, p in enumerate(posts) if "[ссылка на статью]" in p["content"])
+    state = autopilot.AutopilotState.load(); state["next_tg_post_idx"] = placeholder; autopilot.AutopilotState.save(state)
+
+    res = asyncio.run(engine.step_telegram_post())
+
+    assert res["success"] is True
+    assert len(RecordingBot.sent) == 1 and "[ссылка на статью]" not in RecordingBot.sent[0]["text"]
+    assert RecordingBot.sent[0]["text"].strip()
+    assert len(isolated) == 1 and "[ссылка на статью]" in isolated[0]["error_message"]
+    assert autopilot.AutopilotState.load()["next_tg_post_idx"] == placeholder + 2
+
+
+def test_all_posts_with_placeholders_send_nothing(monkeypatch, tmp_path, isolated):
+    import aiogram
+    RecordingBot.sent = []
+    monkeypatch.setattr(aiogram, "Bot", RecordingBot)
+    monkeypatch.setenv("OPP_BOT_TOKEN", "123456:" + "x" * 35)
+    engine = autopilot.AutopilotEngine(profile=_own_posts_profile(tmp_path, "example-company"))
+    monkeypatch.setattr(autopilot, "load_posts", lambda profile: [
+        {"id": "a", "title": "A", "content": "Читать: [ссылка на статью]"},
+        {"id": "b", "title": "B", "content": "Тут [вставить кейс] и [ссылка](https://example.com)"}])
+
+    res = asyncio.run(engine.step_telegram_post())
+
+    assert RecordingBot.sent == []
+    assert res.get("skip_slot") is True
+    assert len(isolated) == 1
+
+
+def test_single_asterisk_italics_become_html(monkeypatch, tmp_path, isolated):
+    # prod 2026-10-22: «*(Буду рад вашим комментариям…)*» reached the channel with the asterisks
+    import aiogram
+    RecordingBot.sent = []
+    monkeypatch.setattr(aiogram, "Bot", RecordingBot)
+    monkeypatch.setenv("OPP_BOT_TOKEN", "123456:" + "x" * 35)
+    engine = autopilot.AutopilotEngine(profile=_own_posts_profile(tmp_path, "example-company"))
+    monkeypatch.setattr(autopilot, "load_posts", lambda profile: [
+        {"id": "a", "title": "A", "content": "**Жирно** и *(буду рад комментариям)*, [бот](https://t.me/x_bot?start=a_b)"}])
+
+    asyncio.run(engine.step_telegram_post())
+
+    assert RecordingBot.sent[0]["text"] == ('<b>Жирно</b> и <i>(буду рад комментариям)</i>, '
+                                           '<a href="https://t.me/x_bot?start=a_b">бот</a>')
+
+
+def test_markdown_links_are_not_placeholders():
+    assert autopilot.unfilled_placeholders("Пишите [в боте](https://t.me/x_bot?start=a) **жирно**") == []
+    assert autopilot.unfilled_placeholders("👉 [Ссылка на публикацию на VC.ru / Дзене]\n") == [
+        "[Ссылка на публикацию на VC.ru / Дзене]"]
+
+
 def _own_posts_profile(tmp_path, name):
     """Copy of an example profile that ships its own telegram templates (as a real install would)."""
     import shutil
